@@ -33,6 +33,8 @@
 6. 创建后进入 Environment，配置变量（见第 2 节和第 2.1 节）。
 
 说明：Render 的托管 Postgres 在部分套餐可能收费，你可直接用 Neon 免费 PostgreSQL。
+若暂时不想配置数据库，也可以先不填 `DATABASE_URL`：项目会自动使用 SQLite 兜底并启动。
+注意：该模式适合先跑通，不适合长期持久化数据（重部署后数据可能丢失）。
 
 ## 2. 设置后端 CORS
 
@@ -52,6 +54,12 @@
 2. 复制连接串（Connection string）。
 3. 在 Render 后端 Environment 新增：
    - `DATABASE_URL=<你的 Neon 连接串>`
+
+如果你在日志里看到：
+
+`failed to resolve host 'db'`
+
+表示当前仍在使用旧默认值（Docker Compose 内网主机名）。请在 Environment 设置 `DATABASE_URL` 后重新部署，或升级到最新代码后使用 SQLite 默认兜底。
 
 可选变量：
 

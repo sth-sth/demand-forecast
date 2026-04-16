@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     environment: str = "dev"
 
-    database_url: str = "postgresql+psycopg://forecast:forecast@db:5432/forecast"
+    # Default to local SQLite so single-service managed deploys can start without
+    # requiring a pre-provisioned Postgres instance. Production can override
+    # with DATABASE_URL (e.g. Neon/Render Postgres).
+    database_url: str = "sqlite:///./forecast.db"
     # Keep as string to avoid pydantic-settings JSON parsing errors for comma-separated env values.
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
 
