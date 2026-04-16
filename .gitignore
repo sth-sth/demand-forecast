@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+
+# Local env and data
+.env
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+
+# OS and editor
+.DS_Store
+.vscode/

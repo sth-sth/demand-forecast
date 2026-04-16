@@ -1,0 +1,16 @@
+[Unit]
+Description=Demand Forecast Production Stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/demand-forecast
+RemainAfterExit=yes
+ExecStart=/opt/demand-forecast/scripts/prod.sh up
+ExecStop=/opt/demand-forecast/scripts/prod.sh down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
