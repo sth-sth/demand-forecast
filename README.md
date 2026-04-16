@@ -325,6 +325,19 @@ BACKEND_API_BASE=https://your-backend.onrender.com/api ./scripts/vercel_sync_api
 
 详细步骤见：`docs/render-deploy-zh.md`
 
+如果你的 Render 账号里 Blueprint 不可用或需要付费，也可以手动创建（免费）：
+
+1. New Web Service，连接本仓库。
+2. Environment 选择 Docker。
+3. 保持默认 Dockerfile Path=`Dockerfile`（仓库根目录已提供）。
+4. Health Check Path 填 `/api/health`。
+5. 环境变量里设置 `DATABASE_URL`（建议使用 Neon 免费 Postgres）和 `CORS_ORIGINS`（你的 Vercel 域名）。
+6. 部署成功后，执行：
+
+```bash
+BACKEND_API_BASE=https://你的render后端域名/api ./scripts/vercel_sync_api.sh
+```
+
 最快方式（推荐，交互式输入 3 个参数）：
 
 ```bash

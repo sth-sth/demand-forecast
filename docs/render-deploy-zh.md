@@ -21,6 +21,19 @@
 
 - `https://your-backend.onrender.com`
 
+### 1.1 Blueprint 不可用时（手动免费方案）
+
+如果你的账号里 Blueprint 不可用或提示付费，可以手动创建一个 Web Service（免费实例）：
+
+1. Render -> New Web Service。
+2. 连接本仓库并选择 `main`。
+3. Environment 选 `Docker`。
+4. Dockerfile Path 使用默认值 `Dockerfile`（仓库根目录已提供）。
+5. Health Check Path 填 `/api/health`。
+6. 创建后进入 Environment，配置变量（见第 2 节和第 2.1 节）。
+
+说明：Render 的托管 Postgres 在部分套餐可能收费，你可直接用 Neon 免费 PostgreSQL。
+
 ## 2. 设置后端 CORS
 
 在 Render 后端服务的 Environment 中设置：
@@ -32,6 +45,20 @@
 - `CORS_ORIGINS=https://a.vercel.app,https://b.vercel.app`
 
 保存后点击 Redeploy。
+
+## 2.1 数据库（免费推荐 Neon）
+
+1. 注册 Neon 并创建一个 Postgres 数据库。
+2. 复制连接串（Connection string）。
+3. 在 Render 后端 Environment 新增：
+   - `DATABASE_URL=<你的 Neon 连接串>`
+
+可选变量：
+
+- `UPLOAD_DIR=/app/data/uploads`
+- `ENVIRONMENT=production`
+
+提示：本项目已兼容 `postgres://` 与 `postgresql://` 两种格式，无需手动改前缀。
 
 ## 3. 让前端指向 Render 后端
 
