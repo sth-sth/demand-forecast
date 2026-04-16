@@ -11,10 +11,66 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+function extractErrorDetail(payload: unknown): string | null {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload.trim();
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const detail = (payload as { detail?: unknown }).detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail.trim();
+  }
+
+  if (Array.isArray(detail)) {
+    const lines = detail.map((item) => String(item).trim()).filter(Boolean);
+    if (lines.length > 0) {
+      return lines.join("; ");
+    }
+  }
+
+  return null;
+}
+
+function toReadableApiError(error: unknown): Error {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error : new Error("未知错误");
+  }
+
+  if (!error.response) {
+    return new Error(
+      `无法连接后端接口（当前 API 地址：${API_BASE_URL}）。请确认后端已上线，并在前端配置 VITE_API_BASE_URL。`
+    );
+  }
+
+  const status = error.response.status;
+  const detail = extractErrorDetail(error.response.data);
+
+  if (status === 404 && API_BASE_URL === "/api") {
+    return new Error(
+      "接口返回 404：当前前端在请求同域 /api，但该部署通常只托管前端。请把 VITE_API_BASE_URL 配置为后端完整地址（例如 https://your-backend-domain/api）。"
+    );
+  }
+
+  if (detail) {
+    return new Error(`接口请求失败 (${status})：${detail}`);
+  }
+
+  return new Error(`接口请求失败 (${status})`);
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => Promise.reject(toReadableApiError(error))
+);
 
 export async function fetchModels(): Promise<ModelCatalogItem[]> {
   const { data } = await api.get<ModelCatalogItem[]>("/models");
