@@ -311,6 +311,20 @@ Code: NOT_FOUND
 
 如果你希望避免临时隧道失效，建议使用“稳定后端域名 + Vercel 前端”模式：
 
+无 Linux 服务器时，推荐直接使用 Render 托管后端（数据库 + API）+ Vercel 托管前端：
+
+1. 在 Render 选择 New + Blueprint，导入本仓库（根目录已提供 `render.yaml`）。
+2. 等 Render 创建完成后，获取后端地址（例如 `https://your-backend.onrender.com`）。
+3. 执行一条命令同步前端 API 地址并触发 Vercel 重部署：
+
+```bash
+BACKEND_API_BASE=https://your-backend.onrender.com/api ./scripts/vercel_sync_api.sh
+```
+
+4. 在 Render 后端服务环境变量里设置 `CORS_ORIGINS` 为你的 Vercel 生产域名（逗号分隔可填多个），然后点击 Redeploy。
+
+详细步骤见：`docs/render-deploy-zh.md`
+
 最快方式（推荐，交互式输入 3 个参数）：
 
 ```bash
