@@ -311,6 +311,18 @@ Code: NOT_FOUND
 
 如果你希望避免临时隧道失效，建议使用“稳定后端域名 + Vercel 前端”模式：
 
+最快方式（推荐，交互式输入 3 个参数）：
+
+```bash
+./scripts/stable_bootstrap.sh
+```
+
+脚本会自动完成：
+
+- 生成并写入 `.env.prod` / `.env.duckdns`
+- 启动 DuckDNS 长期模式（HTTPS + 健康检查）
+- 若检测到已登录 Vercel，自动同步 `VITE_API_BASE_URL` 并触发生产重部署
+
 1. 在云主机部署后端（可直接使用 DuckDNS 长期脚本）：
 
 ```bash
