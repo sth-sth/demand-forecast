@@ -60,7 +60,14 @@ check_local_url() {
     return 0
   fi
 
+  local health_url
+  health_url="${LOCAL_URL%/}/api/health"
+  if curl --silent --show-error --fail --max-time 4 "$health_url" >/dev/null 2>&1; then
+    return 0
+  fi
+
   echo "Error: LOCAL_URL is not reachable: $LOCAL_URL" >&2
+  echo "Checked endpoints: $LOCAL_URL and $health_url" >&2
   echo "Hint: start services first with ./scripts/demo.sh up" >&2
   echo "Then re-run: ./scripts/share.sh start" >&2
   exit 1

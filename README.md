@@ -307,6 +307,28 @@ Code: NOT_FOUND
 
 说明：当前后端依赖数据库与任务执行链路（FastAPI + Worker + PostgreSQL），建议部署在 Render/Railway/Fly.io/云主机等环境，再由 Vercel 前端调用该后端地址。
 
+### 长期稳定最简流程
+
+如果你希望避免临时隧道失效，建议使用“稳定后端域名 + Vercel 前端”模式：
+
+1. 在云主机部署后端（可直接使用 DuckDNS 长期脚本）：
+
+```bash
+cp .env.example .env
+cp .env.prod.example .env.prod
+cp .env.duckdns.example .env.duckdns
+# 编辑 .env.prod 和 .env.duckdns 后执行
+./scripts/longterm.sh up
+```
+
+2. 一键把前端 API 地址绑定到 Vercel 生产环境并触发重部署：
+
+```bash
+BACKEND_API_BASE=https://你的后端域名/api ./scripts/vercel_sync_api.sh
+```
+
+3. 后续如果后端域名变更，只需重复第 2 步，无需手动点 Vercel 控制台。
+
 ## 13. 生产化建议
 
 - 将后台任务从 FastAPI BackgroundTasks 升级为消息队列（Celery/RQ/Kafka）

@@ -17,3 +17,5 @@ backend/data/uploads/*
 # OS and editor
 .DS_Store
 .vscode/
+.vercel
+.env*.local

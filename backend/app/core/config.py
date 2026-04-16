@@ -2,7 +2,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,23 @@ class Settings(BaseSettings):
     default_horizon: int = 14
     max_horizon: int = 180
     max_tune_trials: int = 50
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip()
+        if normalized.startswith("postgres://"):
+            # Many cloud providers export postgres:// while SQLAlchemy with psycopg
+            # expects postgresql+psycopg://.
+            return f"postgresql+psycopg://{normalized[len('postgres://') :]}"
+
+        if normalized.startswith("postgresql://"):
+            return f"postgresql+psycopg://{normalized[len('postgresql://') :]}"
+
+        return normalized
 
     def cors_origins_list(self) -> list[str]:
         raw = self.cors_origins.strip()
