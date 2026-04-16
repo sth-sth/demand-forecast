@@ -283,6 +283,30 @@ chmod +x scripts/longterm.sh
 
 详细说明见：`docs/production-deploy-zh.md`
 
+## Vercel 部署说明（仅前端）
+
+如果你在 Vercel 打开项目后看到：
+
+```text
+404: NOT_FOUND
+Code: NOT_FOUND
+```
+
+通常是以下两类原因：
+
+- Vercel 没有构建到前端产物（项目根目录/输出目录配置不对）。
+- 前端已上线，但接口仍走默认 `/api`，而 Vercel 上没有同域后端，导致接口 404。
+
+本仓库已提供根目录 `vercel.json`，会让 Vercel 从 `frontend` 构建并输出 `frontend/dist`。
+
+部署建议：
+
+1. 导入仓库到 Vercel 后直接部署（使用仓库根目录即可）。
+2. 在 Vercel 项目环境变量中设置 `VITE_API_BASE_URL`，例如：`https://your-backend-domain/api`。
+3. 重新部署。
+
+说明：当前后端依赖数据库与任务执行链路（FastAPI + Worker + PostgreSQL），建议部署在 Render/Railway/Fly.io/云主机等环境，再由 Vercel 前端调用该后端地址。
+
 ## 13. 生产化建议
 
 - 将后台任务从 FastAPI BackgroundTasks 升级为消息队列（Celery/RQ/Kafka）
