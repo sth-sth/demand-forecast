@@ -17,6 +17,8 @@ services:
         value: /app/data/uploads
       - key: ENVIRONMENT
         value: production
+      - key: PORT
+        value: 10000
 
   - type: static
     name: demand-forecast-frontend
