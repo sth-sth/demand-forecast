@@ -26,4 +26,19 @@ def on_startup() -> None:
     SQLModel.metadata.create_all(engine)
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "service": settings.app_name,
+        "status": "ok",
+        "health": f"{settings.api_prefix}/health",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health")
+def health_root() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 app.include_router(router, prefix=settings.api_prefix)
