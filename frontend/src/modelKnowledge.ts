@@ -35,6 +35,8 @@ export interface ModelKnowledge {
   links: ExternalReference[];
 }
 
+export type KnowledgeLanguage = "zh" | "en";
+
 type FamilyKnowledgeTemplate = {
   overview: string;
   logic: string[];
@@ -1430,7 +1432,181 @@ function mergeParamNotes(model: ModelCatalogItem, extra?: Record<string, string>
   return notes;
 }
 
-export function getModelKnowledge(model: ModelCatalogItem): ModelKnowledge {
+const FAMILY_EN_OVERVIEW: Record<string, string> = {
+  baseline: "Simple baseline models for quick sanity checks and benchmark comparison.",
+  statistical: "Classical time-series models for trend/seasonality with strong interpretability.",
+  intermittent: "Forecasting methods for sparse and intermittent demand patterns.",
+  ml: "Feature-driven machine learning models for non-linear demand relationships.",
+  deep: "Neural forecasting models for large-scale and complex temporal patterns.",
+  ensemble: "Model combination strategies to improve robustness and reduce variance.",
+  hierarchical: "Reconciliation methods to keep forecasts coherent across hierarchy levels.",
+  inventory: "Inventory-oriented probability and expected-demand modeling.",
+};
+
+const FAMILY_EN_LOGIC: Record<string, string[]> = {
+  baseline: [
+    "Use simple historical rules to generate forecasts with minimal training cost.",
+    "Serve as baseline reference before promoting complex models.",
+    "A strong baseline is required for trustworthy model selection.",
+  ],
+  statistical: [
+    "Model trend, seasonality, and residual components from the time series itself.",
+    "Estimate parameters by likelihood or least-squares optimization.",
+    "Useful when business teams need transparent and explainable behavior.",
+  ],
+  intermittent: [
+    "Separate demand occurrence probability from non-zero demand size.",
+    "Stabilize sparse signals through smoothing/aggregation strategies.",
+    "Focus on service level and stockout risk in addition to point accuracy.",
+  ],
+  ml: [
+    "Build supervised features such as lags, rolling stats, and calendar variables.",
+    "Train linear/tree models and optimize hyperparameters by validation metrics.",
+    "Best suited for multi-factor demand with rich explanatory features.",
+  ],
+  deep: [
+    "Train neural networks to capture long-range temporal dependencies.",
+    "Requires stricter experiment tracking and compute planning.",
+    "Can outperform traditional methods on large and complex datasets.",
+  ],
+  ensemble: [
+    "Combine forecasts from multiple base models by mean or weighted blending.",
+    "Reduce variance and improve robustness across diverse series behaviors.",
+    "Re-estimate weights periodically to prevent strategy drift.",
+  ],
+  hierarchical: [
+    "Generate base forecasts then reconcile to satisfy hierarchy constraints.",
+    "Keep top-level planning and bottom-level execution numerically consistent.",
+    "Useful for multi-level planning such as SKU-category-region structures.",
+  ],
+  inventory: [
+    "Predict in-stock probability and map it to expected demand.",
+    "Support replenishment thresholds and safety-stock policy decisions.",
+    "Works well with promotion/stockout/holiday business features.",
+  ],
+};
+
+const FAMILY_EN_TIPS: Record<string, string[]> = {
+  baseline: ["Keep at least one baseline online for continuous model monitoring."],
+  statistical: ["Validate season length against business cadence before production."],
+  intermittent: ["Track stockout/service-level KPIs together with forecasting metrics."],
+  ml: ["Prioritize feature quality and leakage control in the training pipeline."],
+  deep: ["Start with stable baseline models, then introduce deep models incrementally."],
+  ensemble: ["Use diverse base models to maximize ensemble benefit."],
+  hierarchical: ["Validate coherence constraints after every reconciliation run."],
+  inventory: ["Integrate expected demand into replenishment policy, not as an isolated score."],
+};
+
+const COMMON_EN_REPRODUCIBILITY_CHECKLIST = [
+  "Fix random seed (for example 42) to ensure reproducible runs.",
+  "Keep train/validation split policy stable (for example last horizon as backtest window).",
+  "Track data version, parameter version, and metric version for auditability.",
+  "Require champion model to outperform baseline before production promotion.",
+  "Replay at least 2-3 recent business cycles before final rollout.",
+];
+
+const COMMON_PARAM_NOTES_EN: Record<string, string> = {
+  season_length: "Season length (for example 7 daily, 12 monthly).",
+  window: "Rolling window length for smoothing and responsiveness trade-off.",
+  alpha: "Smoothing/regularization strength depending on model family.",
+  beta: "Trend smoothing factor in ETS-like models.",
+  gamma: "Seasonality smoothing factor in ETS-like models.",
+  max_depth: "Maximum tree depth controlling model complexity.",
+  n_estimators: "Number of trees/estimators; higher can improve stability with more cost.",
+  learning_rate: "Update step size in boosting/iterative optimization.",
+};
+
+function buildEnglishParamNotes(model: ModelCatalogItem, extra?: Record<string, string>): Record<string, string> {
+  const notes: Record<string, string> = {};
+  const keySet = new Set<string>([
+    ...Object.keys(model.default_params ?? {}),
+    ...Object.keys(model.tunable_params ?? {}),
+    ...Object.keys(extra ?? {}),
+  ]);
+
+  for (const key of keySet) {
+    if (extra?.[key]) {
+      notes[key] = `Model-specific note: ${key}.`;
+      continue;
+    }
+    if (COMMON_PARAM_NOTES_EN[key]) {
+      notes[key] = COMMON_PARAM_NOTES_EN[key];
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(model.default_params ?? {}, key)) {
+      notes[key] = "Implementation-defined parameter. Tune based on validation and business cadence.";
+    } else {
+      notes[key] = "Hyperparameter search range entry. Configure based on runtime budget.";
+    }
+  }
+
+  return notes;
+}
+
+function buildEnglishKnowledge(model: ModelCatalogItem, zhKnowledge: ModelKnowledge): ModelKnowledge {
+  const family = model.family in FAMILY_EN_OVERVIEW ? model.family : "baseline";
+  const formulaSymbols = (MODEL_FORMULA_PARAMETERS[model.model_name] ?? []).map((row) => row.symbol);
+  const formulaParameters =
+    formulaSymbols.length > 0
+      ? formulaSymbols.map((symbol) => ({
+          symbol,
+          meaning: `Parameter ${symbol}`,
+          businessValueGuide: "Tune by validation metrics and operational constraints.",
+        }))
+      : [
+          {
+            symbol: "theta",
+            meaning: "Model parameters",
+            businessValueGuide: "Estimated during training and verified in backtest.",
+          },
+        ];
+
+  return {
+    overview: `${model.model_name}: ${FAMILY_EN_OVERVIEW[family]}`,
+    logic: FAMILY_EN_LOGIC[family] ?? FAMILY_EN_LOGIC.baseline,
+    functionPackages: zhKnowledge.functionPackages,
+    formula: zhKnowledge.formula,
+    updateEquations: [
+      "State update and recursive forecast equations are listed below.",
+      ...zhKnowledge.formula,
+    ],
+    formulaParameters,
+    mathWorkflow: [
+      "Define horizon, metric, and evaluation window.",
+      "Apply model equations and estimate parameters from training data.",
+      "Generate multi-step predictions recursively or directly.",
+      "Validate with MAE/RMSE/MAPE/sMAPE/WAPE/MASE and compare against baseline.",
+    ],
+    manualCalculationSteps: [
+      "Pick one short sample window and substitute values into the model formula.",
+      "Compute predicted value step-by-step and compare with actual observations.",
+      "Summarize absolute/percentage error for manual sanity check.",
+    ],
+    example: [
+      `Example: run ${model.model_name} on recent history and compare its forecast with baseline models.`,
+      "Use backtest ranking and business constraints together before production rollout.",
+    ],
+    pythonWorkflow: [
+      { step: "Step 1: Prepare data", detail: "Keep ds/y/unique_id fields and sort by time." },
+      { step: "Step 2: Train model", detail: `Train ${model.model_name} with configured parameters.` },
+      { step: "Step 3: Forecast", detail: "Generate horizon-step prediction output." },
+      { step: "Step 4: Evaluate", detail: "Compute unified metrics and compare against baseline." },
+      { step: "Step 5: Promote", detail: "Promote only when metrics and business checks pass." },
+    ],
+    pythonReferenceCode: zhKnowledge.pythonReferenceCode,
+    excelWorkflow: [
+      "Place actual values and predictions in separate columns.",
+      "Recompute selected metric with explicit Excel formulas.",
+      "Cross-check champion vs baseline in the same sheet.",
+    ],
+    reproducibilityChecklist: COMMON_EN_REPRODUCIBILITY_CHECKLIST,
+    paramNotes: buildEnglishParamNotes(model, MODEL_OVERRIDES[model.model_name]?.paramNotes),
+    tips: FAMILY_EN_TIPS[family] ?? FAMILY_EN_TIPS.baseline,
+    links: zhKnowledge.links,
+  };
+}
+
+export function getModelKnowledge(model: ModelCatalogItem, language: KnowledgeLanguage = "zh"): ModelKnowledge {
   const familyDefault =
     FAMILY_DEFAULT[model.family] ??
     FAMILY_DEFAULT.baseline;
@@ -1453,7 +1629,7 @@ export function getModelKnowledge(model: ModelCatalogItem): ModelKnowledge {
   const familyPythonReferenceCode =
     FAMILY_PYTHON_REFERENCE_CODE[model.family] ?? FAMILY_PYTHON_REFERENCE_CODE.baseline;
 
-  return {
+  const zhKnowledge: ModelKnowledge = {
     overview: override?.overview ?? familyDefault.overview,
     logic: override?.logic ?? familyDefault.logic,
     functionPackages:
@@ -1491,4 +1667,10 @@ export function getModelKnowledge(model: ModelCatalogItem): ModelKnowledge {
     links: override?.links ?? familyDefault.links,
     paramNotes: mergeParamNotes(model, override?.paramNotes),
   };
+
+  if (language === "en") {
+    return buildEnglishKnowledge(model, zhKnowledge);
+  }
+
+  return zhKnowledge;
 }

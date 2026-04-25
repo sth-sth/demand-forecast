@@ -852,8 +852,8 @@ export default function App() {
     if (!championModelSpec) {
       return null;
     }
-    return getModelKnowledge(championModelSpec);
-  }, [championModelSpec]);
+    return getModelKnowledge(championModelSpec, language);
+  }, [championModelSpec, language]);
 
   const championParamEntries = useMemo(() => {
     if (championResult) {
@@ -1561,7 +1561,7 @@ print(scores)`;
 
           <div className="knowledge-grid">
             {filteredModels.map((model) => {
-              const knowledge = getModelKnowledge(model);
+              const knowledge = getModelKnowledge(model, language);
               const paramEntries = Object.entries(knowledge.paramNotes);
               const logicItems = knowledge.logic;
               const functionPackageItems = knowledge.functionPackages;
