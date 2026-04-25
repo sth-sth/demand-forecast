@@ -12,11 +12,21 @@ services:
           name: demand-forecast-db
           property: connectionString
       - key: CORS_ORIGINS
-        value: https://demand-forecast.vercel.app
+        value: https://demand-forecast-frontend.onrender.com,http://localhost:5173,http://localhost:8080
       - key: UPLOAD_DIR
         value: /app/data/uploads
       - key: ENVIRONMENT
         value: production
+
+  - type: static
+    name: demand-forecast-frontend
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://demand-forecast-backend.onrender.com/api
 
 databases:
   - name: demand-forecast-db

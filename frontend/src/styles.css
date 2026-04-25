@@ -54,6 +54,34 @@ body {
   line-height: 1.1;
 }
 
+.hero-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.lang-switch {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.lang-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.lang-btn.active {
+  background: linear-gradient(110deg, var(--rust), var(--sun));
+  color: #fff;
+  border-color: transparent;
+}
+
 .grid {
   max-width: 1200px;
   margin: 0 auto;
@@ -484,6 +512,11 @@ footer {
 @media (max-width: 980px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-top-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .form-grid {

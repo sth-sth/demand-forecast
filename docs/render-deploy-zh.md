@@ -4,7 +4,7 @@
 
 推荐架构：
 
-- 前端：Vercel
+- 前端：Render Static Site（或 Vercel）
 - 后端：Render Web Service（Docker）
 - 数据库：Render PostgreSQL
 
@@ -15,11 +15,16 @@
 3. 连接你的 GitHub 仓库并选择本项目。
 4. Render 会读取仓库根目录的 `render.yaml`，自动创建：
    - `demand-forecast-backend`（Web Service）
+   - `demand-forecast-frontend`（Static Site）
    - `demand-forecast-db`（PostgreSQL）
 
 等待部署完成后，记下后端域名，例如：
 
 - `https://your-backend.onrender.com`
+
+同时会得到前端域名（默认）：
+
+- `https://demand-forecast-frontend.onrender.com`
 
 ### 1.1 Blueprint 不可用时（手动免费方案）
 
@@ -68,7 +73,19 @@
 
 提示：本项目已兼容 `postgres://` 与 `postgresql://` 两种格式，无需手动改前缀。
 
-## 3. 让前端指向 Render 后端
+## 3. 前端访问方式
+
+如果使用 Render Blueprint 默认前端服务，`VITE_API_BASE_URL` 已在 `render.yaml` 中默认指向 Render 后端。
+
+直接访问：
+
+- `https://demand-forecast-frontend.onrender.com`
+
+如果你改了服务名或域名，请在 Render 前端服务的 Environment 里更新：
+
+- `VITE_API_BASE_URL=https://你的后端域名/api`
+
+## 4. 如果你使用 Vercel 前端，再执行 API 同步
 
 在仓库根目录执行：
 
@@ -81,7 +98,7 @@ BACKEND_API_BASE=https://your-backend.onrender.com/api ./scripts/vercel_sync_api
 - 更新 Vercel 生产环境变量 `VITE_API_BASE_URL`
 - 触发一次生产重部署
 
-## 4. 验证
+## 5. 验证
 
 先检查后端：
 
@@ -89,14 +106,15 @@ BACKEND_API_BASE=https://your-backend.onrender.com/api ./scripts/vercel_sync_api
 
 再打开前端：
 
-- `https://你的vercel域名`
+- Render 前端：`https://demand-forecast-frontend.onrender.com`
+- 或 Vercel 前端：`https://你的vercel域名`
 
 然后测试：
 
 - 加载 Demo 数据
 - 一键跑 Demo
 
-## 5. 常见问题
+## 6. 常见问题
 
 1. 前端提示 404 或接口失败
    - 检查 `VITE_API_BASE_URL` 是否指向 Render 后端 `/api`。

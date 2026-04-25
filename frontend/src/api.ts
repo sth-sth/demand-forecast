@@ -11,6 +11,13 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+function isEnglishUi(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return window.localStorage.getItem("df_lang") === "en";
+}
+
 function extractErrorDetail(payload: unknown): string | null {
   if (typeof payload === "string" && payload.trim()) {
     return payload.trim();
@@ -36,13 +43,17 @@ function extractErrorDetail(payload: unknown): string | null {
 }
 
 function toReadableApiError(error: unknown): Error {
+  const en = isEnglishUi();
+
   if (!axios.isAxiosError(error)) {
-    return error instanceof Error ? error : new Error("未知错误");
+    return error instanceof Error ? error : new Error(en ? "Unknown error" : "未知错误");
   }
 
   if (!error.response) {
     return new Error(
-      `无法连接后端接口（当前 API 地址：${API_BASE_URL}）。请确认后端已上线，并在前端配置 VITE_API_BASE_URL。`
+      en
+        ? `Cannot connect to backend API (current base URL: ${API_BASE_URL}). Ensure backend is online and VITE_API_BASE_URL is configured.`
+        : `无法连接后端接口（当前 API 地址：${API_BASE_URL}）。请确认后端已上线，并在前端配置 VITE_API_BASE_URL。`
     );
   }
 
@@ -51,15 +62,17 @@ function toReadableApiError(error: unknown): Error {
 
   if (status === 404 && API_BASE_URL === "/api") {
     return new Error(
-      "接口返回 404：当前前端在请求同域 /api，但该部署通常只托管前端。请把 VITE_API_BASE_URL 配置为后端完整地址（例如 https://your-backend-domain/api）。"
+      en
+        ? "API returned 404: frontend is calling same-origin /api, but this deployment likely hosts frontend only. Set VITE_API_BASE_URL to your backend URL (for example https://your-backend-domain/api)."
+        : "接口返回 404：当前前端在请求同域 /api，但该部署通常只托管前端。请把 VITE_API_BASE_URL 配置为后端完整地址（例如 https://your-backend-domain/api）。"
     );
   }
 
   if (detail) {
-    return new Error(`接口请求失败 (${status})：${detail}`);
+    return new Error(en ? `API request failed (${status}): ${detail}` : `接口请求失败 (${status})：${detail}`);
   }
 
-  return new Error(`接口请求失败 (${status})`);
+  return new Error(en ? `API request failed (${status})` : `接口请求失败 (${status})`);
 }
 
 const api = axios.create({

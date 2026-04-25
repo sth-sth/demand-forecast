@@ -73,6 +73,12 @@ type MetricFormulaGuide = {
   }>;
 };
 
+type Language = "zh" | "en";
+
+function textByLang(language: Language, zh: string, en: string): string {
+  return language === "en" ? en : zh;
+}
+
 function MarkdownMath({
   content,
   className,
@@ -91,13 +97,23 @@ function MarkdownMath({
   );
 }
 
-const PIPELINE_STAGE_LABEL: Record<PipelineStage, string> = {
-  idle: "待启动",
-  "selection-running": "阶段1进行中：模型选优",
-  "selection-completed": "阶段1完成：已得到最佳模型",
-  "future-running": "阶段2进行中：未来预测",
-  completed: "两阶段完成：未来预测已生成",
-  failed: "执行失败",
+const PIPELINE_STAGE_LABEL: Record<Language, Record<PipelineStage, string>> = {
+  zh: {
+    idle: "待启动",
+    "selection-running": "阶段1进行中：模型选优",
+    "selection-completed": "阶段1完成：已得到最佳模型",
+    "future-running": "阶段2进行中：未来预测",
+    completed: "两阶段完成：未来预测已生成",
+    failed: "执行失败",
+  },
+  en: {
+    idle: "Not started",
+    "selection-running": "Stage 1 running: model selection",
+    "selection-completed": "Stage 1 completed: champion selected",
+    "future-running": "Stage 2 running: future forecast",
+    completed: "Two stages completed: future forecast generated",
+    failed: "Execution failed",
+  },
 };
 
 function getRunMode(run: Run | null): RunMode {
@@ -142,14 +158,24 @@ declare global {
   }
 }
 
-const METRIC_OPTIONS = [
-  { value: "smape", label: "sMAPE（对称平均绝对百分比误差）" },
-  { value: "mape", label: "MAPE（平均绝对百分比误差）" },
-  { value: "mae", label: "MAE（平均绝对误差）" },
-  { value: "rmse", label: "RMSE（均方根误差）" },
-  { value: "wape", label: "WAPE（加权平均绝对百分比误差）" },
-  { value: "mase", label: "MASE（平均绝对缩放误差）" },
-];
+const METRIC_OPTIONS: Record<Language, Array<{ value: string; label: string }>> = {
+  zh: [
+    { value: "smape", label: "sMAPE（对称平均绝对百分比误差）" },
+    { value: "mape", label: "MAPE（平均绝对百分比误差）" },
+    { value: "mae", label: "MAE（平均绝对误差）" },
+    { value: "rmse", label: "RMSE（均方根误差）" },
+    { value: "wape", label: "WAPE（加权平均绝对百分比误差）" },
+    { value: "mase", label: "MASE（平均绝对缩放误差）" },
+  ],
+  en: [
+    { value: "smape", label: "sMAPE (symmetric mean absolute percentage error)" },
+    { value: "mape", label: "MAPE (mean absolute percentage error)" },
+    { value: "mae", label: "MAE (mean absolute error)" },
+    { value: "rmse", label: "RMSE (root mean square error)" },
+    { value: "wape", label: "WAPE (weighted absolute percentage error)" },
+    { value: "mase", label: "MASE (mean absolute scaled error)" },
+  ],
+};
 
 const METRIC_FORMULA_GUIDES: Record<string, MetricFormulaGuide> = {
   mae: {
@@ -210,6 +236,65 @@ const METRIC_FORMULA_GUIDES: Record<string, MetricFormulaGuide> = {
   },
 };
 
+const METRIC_FORMULA_GUIDES_EN: Record<string, MetricFormulaGuide> = {
+  mae: {
+    formula: "$$MAE=\\frac{1}{n}\\sum_{i=1}^{n}|y_i-\\hat{y}_i|$$",
+    explanation: "Mean absolute error. Lower is better.",
+    params: [
+      { symbol: "y_i", meaning: "actual demand at sample i" },
+      { symbol: "y_pred_i", meaning: "predicted demand at sample i" },
+      { symbol: "n", meaning: "number of samples" },
+    ],
+  },
+  rmse: {
+    formula: "$$RMSE=\\sqrt{\\frac{1}{n}\\sum_{i=1}^{n}(y_i-\\hat{y}_i)^2}$$",
+    explanation: "Penalizes large errors more strongly.",
+    params: [
+      { symbol: "y_i", meaning: "actual demand at sample i" },
+      { symbol: "y_pred_i", meaning: "predicted demand at sample i" },
+      { symbol: "n", meaning: "number of samples" },
+    ],
+  },
+  mape: {
+    formula: "$$MAPE=\\frac{100}{n}\\sum_{i=1}^{n}\\left|\\frac{y_i-\\hat{y}_i}{\\max(|y_i|,\\epsilon)}\\right|$$",
+    explanation: "Percentage error for cross-series comparison.",
+    params: [
+      { symbol: "eps", meaning: "small constant to avoid division by zero" },
+      { symbol: "y_i", meaning: "actual demand at sample i" },
+      { symbol: "y_pred_i", meaning: "predicted demand at sample i" },
+    ],
+  },
+  smape: {
+    formula:
+      "$$sMAPE=\\frac{100}{n}\\sum_{i=1}^{n}\\frac{|y_i-\\hat{y}_i|}{\\max((|y_i|+|\\hat{y}_i|)/2,\\epsilon)}$$",
+    explanation: "Symmetric percentage error, reducing scale bias.",
+    params: [
+      { symbol: "eps", meaning: "small constant for denominator stability" },
+      { symbol: "y_i", meaning: "actual demand at sample i" },
+      { symbol: "y_pred_i", meaning: "predicted demand at sample i" },
+    ],
+  },
+  wape: {
+    formula: "$$WAPE=100\\cdot\\frac{\\sum_i|y_i-\\hat{y}_i|}{\\max(\\sum_i|y_i|,\\epsilon)}$$",
+    explanation: "Volume-weighted percentage error.",
+    params: [
+      { symbol: "sum|y_i|", meaning: "sum of absolute actual demand" },
+      { symbol: "sum|y_i-y_pred_i|", meaning: "sum of absolute errors" },
+      { symbol: "eps", meaning: "small constant for denominator stability" },
+    ],
+  },
+  mase: {
+    formula:
+      "$$MASE=\\frac{mean(|y_i-\\hat{y}_i|)}{\\max(mean(|y_t-y_{t-m}|),\\epsilon)}$$",
+    explanation: "Error scaled by seasonal naive baseline.",
+    params: [
+      { symbol: "m", meaning: "season length" },
+      { symbol: "y_t - y_{t-m}", meaning: "seasonal naive error baseline" },
+      { symbol: "eps", meaning: "small constant for denominator stability" },
+    ],
+  },
+};
+
 const METRIC_EXCEL_WORKFLOW_GUIDES: Record<string, string[]> = {
   mae: [
     "将真实值放在 B 列，预测值放在 C 列。",
@@ -243,29 +328,89 @@ const METRIC_EXCEL_WORKFLOW_GUIDES: Record<string, string[]> = {
   ],
 };
 
-const FAMILY_LABELS: Record<string, string> = {
-  baseline: "基线模型",
-  statistical: "统计模型",
-  intermittent: "间歇需求模型",
-  ml: "机器学习模型",
-  deep: "深度学习模型",
-  ensemble: "集成模型",
-  hierarchical: "层级模型",
-  inventory: "库存业务模型",
+const METRIC_EXCEL_WORKFLOW_GUIDES_EN: Record<string, string[]> = {
+  mae: [
+    "Put actual values in column B and predictions in column C.",
+    "In D2 use absolute error: `=ABS(B2-C2)` and fill down.",
+    "MAE: `=AVERAGE(D2:Dn)`.",
+  ],
+  rmse: [
+    "Put actual values in column B and predictions in column C.",
+    "In D2 use squared error: `=(B2-C2)^2` and fill down.",
+    "RMSE: `=SQRT(AVERAGE(D2:Dn))`.",
+  ],
+  mape: [
+    "Set actuals in B and predictions in C, with `eps` in H1 (e.g. 0.00000001).",
+    "In D2 use: `=ABS((B2-C2)/MAX(ABS(B2),$H$1))` and fill down.",
+    "MAPE(%): `=AVERAGE(D2:Dn)*100`.",
+  ],
+  smape: [
+    "Set actuals in B and predictions in C, with `eps` in H1 (e.g. 0.00000001).",
+    "In D2 use: `=ABS(B2-C2)/MAX((ABS(B2)+ABS(C2))/2,$H$1)` and fill down.",
+    "sMAPE(%): `=AVERAGE(D2:Dn)*100`.",
+  ],
+  wape: [
+    "Set actuals in B and predictions in C, with `eps` in H1 (e.g. 0.00000001).",
+    "In D2 use absolute error: `=ABS(B2-C2)` and fill down.",
+    "WAPE(%): `=SUM(D2:Dn)/MAX(SUM(ABS(B2:Bn)),$H$1)*100`.",
+  ],
+  mase: [
+    "Set actuals in B and predictions in C, seasonality `m` in H1, and `eps` in H2.",
+    "D2: `=ABS(B2-C2)`; E(m+2): `=ABS(B(m+2)-B2)` for seasonal naive errors.",
+    "MASE: `=AVERAGE(D2:Dn)/MAX(AVERAGE(E(m+2):En),$H$2)`.",
+  ],
 };
 
-const COLUMN_EXPLANATIONS: Record<string, string> = {
-  "日期": "业务日期（time_col）：每一行需求记录对应的发生日期。",
-  "销量": "需求目标值（target_col）：该日期该商品的实际销量。",
-  "商品编码": "序列ID（item_col）：用于区分不同商品或门店的时序。",
-  "是否促销": "促销标记：1 表示促销，0 表示非促销。",
-  "是否缺货": "缺货标记：1 表示出现缺货，0 表示正常供给。",
-  "价格": "销售价格：用于业务解释，也可扩展为外生变量。",
-  "温度": "环境温度：示例外部因素字段。",
-  "节假日标签": "节假日标签：用于观察节日对需求波动的影响。",
-  ds: "时间列（ds）：标准化后的日期字段。",
-  y: "目标列（y）：标准化后的需求值字段。",
-  unique_id: "序列ID（unique_id）：标准化后的商品/门店标识。",
+const FAMILY_LABELS: Record<Language, Record<string, string>> = {
+  zh: {
+    baseline: "基线模型",
+    statistical: "统计模型",
+    intermittent: "间歇需求模型",
+    ml: "机器学习模型",
+    deep: "深度学习模型",
+    ensemble: "集成模型",
+    hierarchical: "层级模型",
+    inventory: "库存业务模型",
+  },
+  en: {
+    baseline: "Baseline",
+    statistical: "Statistical",
+    intermittent: "Intermittent demand",
+    ml: "Machine learning",
+    deep: "Deep learning",
+    ensemble: "Ensemble",
+    hierarchical: "Hierarchical",
+    inventory: "Inventory",
+  },
+};
+
+const COLUMN_EXPLANATIONS: Record<Language, Record<string, string>> = {
+  zh: {
+    "日期": "业务日期（time_col）：每一行需求记录对应的发生日期。",
+    "销量": "需求目标值（target_col）：该日期该商品的实际销量。",
+    "商品编码": "序列ID（item_col）：用于区分不同商品或门店的时序。",
+    "是否促销": "促销标记：1 表示促销，0 表示非促销。",
+    "是否缺货": "缺货标记：1 表示出现缺货，0 表示正常供给。",
+    "价格": "销售价格：用于业务解释，也可扩展为外生变量。",
+    "温度": "环境温度：示例外部因素字段。",
+    "节假日标签": "节假日标签：用于观察节日对需求波动的影响。",
+    ds: "时间列（ds）：标准化后的日期字段。",
+    y: "目标列（y）：标准化后的需求值字段。",
+    unique_id: "序列ID（unique_id）：标准化后的商品/门店标识。",
+  },
+  en: {
+    "日期": "Business date (time_col): date of each demand record.",
+    "销量": "Target demand (target_col): actual sales for this date and item.",
+    "商品编码": "Series ID (item_col): item/store identifier for multi-series forecasting.",
+    "是否促销": "Promotion flag: 1 means promotion, 0 means no promotion.",
+    "是否缺货": "Stockout flag: 1 means stockout happened, 0 means normal supply.",
+    "价格": "Price: business feature, can be used as exogenous input.",
+    "温度": "Temperature: example external factor feature.",
+    "节假日标签": "Holiday label: used to observe holiday impact on demand.",
+    ds: "Time column (ds): normalized datetime field.",
+    y: "Target column (y): normalized demand value.",
+    unique_id: "Series ID (unique_id): normalized item/store identifier.",
+  },
 };
 
 const DEMO_FAST_MODELS = [
@@ -342,7 +487,7 @@ function toPredictionPoints(result: ModelResult | null): PredictionPoint[] {
   return points;
 }
 
-function buildResidualFigure(points: PredictionPoint[]): PlotlyFigure | undefined {
+function buildResidualFigure(points: PredictionPoint[], language: Language): PlotlyFigure | undefined {
   if (points.length === 0) {
     return undefined;
   }
@@ -358,14 +503,14 @@ function buildResidualFigure(points: PredictionPoint[]): PlotlyFigure | undefine
       },
     ],
     layout: {
-      title: "冠军模型残差分布",
-      xaxis: { title: "残差 (实际 - 预测)" },
-      yaxis: { title: "频次" },
+      title: language === "en" ? "Champion residual distribution" : "冠军模型残差分布",
+      xaxis: { title: language === "en" ? "Residual (actual - predicted)" : "残差 (实际 - 预测)" },
+      yaxis: { title: language === "en" ? "Frequency" : "频次" },
     },
   };
 }
 
-function buildScatterFigure(points: PredictionPoint[]): PlotlyFigure | undefined {
+function buildScatterFigure(points: PredictionPoint[], language: Language): PlotlyFigure | undefined {
   if (points.length === 0) {
     return undefined;
   }
@@ -388,14 +533,14 @@ function buildScatterFigure(points: PredictionPoint[]): PlotlyFigure | undefined
       marker: { size: 8, opacity: 0.7 },
     })),
     layout: {
-      title: "冠军模型 实际值 vs 预测值",
-      xaxis: { title: "实际值" },
-      yaxis: { title: "预测值" },
+      title: language === "en" ? "Champion actual vs predicted" : "冠军模型 实际值 vs 预测值",
+      xaxis: { title: language === "en" ? "Actual" : "实际值" },
+      yaxis: { title: language === "en" ? "Predicted" : "预测值" },
     },
   };
 }
 
-function buildRuntimeFigure(results: ModelResult[]): PlotlyFigure | undefined {
+function buildRuntimeFigure(results: ModelResult[], language: Language): PlotlyFigure | undefined {
   const successRows = results.filter((item) => item.status === "success");
   if (successRows.length === 0) {
     return undefined;
@@ -412,14 +557,14 @@ function buildRuntimeFigure(results: ModelResult[]): PlotlyFigure | undefined {
       },
     ],
     layout: {
-      title: "模型训练耗时对比",
-      xaxis: { title: "模型" },
-      yaxis: { title: "训练秒数" },
+      title: language === "en" ? "Training time comparison" : "模型训练耗时对比",
+      xaxis: { title: language === "en" ? "Model" : "模型" },
+      yaxis: { title: language === "en" ? "Seconds" : "训练秒数" },
     },
   };
 }
 
-function buildMetricHeatmapFigure(results: ModelResult[]): PlotlyFigure | undefined {
+function buildMetricHeatmapFigure(results: ModelResult[], language: Language): PlotlyFigure | undefined {
   const successRows = results.filter((item) => item.status === "success");
   if (successRows.length === 0) {
     return undefined;
@@ -445,9 +590,12 @@ function buildMetricHeatmapFigure(results: ModelResult[]): PlotlyFigure | undefi
       },
     ],
     layout: {
-      title: "Top 模型指标热力图（按 sMAPE）",
-      xaxis: { title: "指标" },
-      yaxis: { title: "模型" },
+      title:
+        language === "en"
+          ? "Top model metric heatmap (sorted by sMAPE)"
+          : "Top 模型指标热力图（按 sMAPE）",
+      xaxis: { title: language === "en" ? "Metric" : "指标" },
+      yaxis: { title: language === "en" ? "Model" : "模型" },
     },
   };
 }
@@ -455,9 +603,11 @@ function buildMetricHeatmapFigure(results: ModelResult[]): PlotlyFigure | undefi
 function PlotCanvas({
   figure,
   layoutOverrides,
+  loadingText,
 }: {
   figure: PlotlyFigure;
   layoutOverrides?: Record<string, unknown>;
+  loadingText: string;
 }) {
   const plotRef = useRef<HTMLDivElement | null>(null);
   const [plotlyReady, setPlotlyReady] = useState(
@@ -505,18 +655,28 @@ function PlotCanvas({
   }, [figure.data, figure.layout, layoutOverrides, plotlyReady]);
 
   if (!plotlyReady) {
-    return <p className="muted">图表引擎加载中，请稍后...</p>;
+    return <p className="muted">{loadingText}</p>;
   }
 
   return <div ref={plotRef} className="plot-canvas" />;
 }
 
-function FigurePanel({ title, figure }: { title: string; figure?: PlotlyFigure }) {
+function FigurePanel({
+  title,
+  figure,
+  emptyText,
+  loadingText,
+}: {
+  title: string;
+  figure?: PlotlyFigure;
+  emptyText: string;
+  loadingText: string;
+}) {
   if (!figure?.data || figure.data.length === 0) {
     return (
       <section className="card">
         <h3>{title}</h3>
-        <p className="muted">暂无可视化结果，先运行一次预测任务。</p>
+        <p className="muted">{emptyText}</p>
       </section>
     );
   }
@@ -527,6 +687,7 @@ function FigurePanel({ title, figure }: { title: string; figure?: PlotlyFigure }
       <div className="plot-wrap">
         <PlotCanvas
           figure={figure}
+          loadingText={loadingText}
           layoutOverrides={{
             autosize: true,
             paper_bgcolor: "#fff9ef",
@@ -541,6 +702,14 @@ function FigurePanel({ title, figure }: { title: string; figure?: PlotlyFigure }
 }
 
 export default function App() {
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window === "undefined") {
+      return "zh";
+    }
+    const saved = window.localStorage.getItem("df_lang");
+    return saved === "en" ? "en" : "zh";
+  });
+
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [datasetPreview, setDatasetPreview] = useState<DatasetPreview | null>(null);
@@ -578,6 +747,15 @@ export default function App() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("平台已就绪，可上传数据或一键运行 Demo。");
+  const t = (zh: string, en: string) => textByLang(language, zh, en);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem("df_lang", language);
+    document.documentElement.lang = language === "en" ? "en" : "zh-CN";
+  }, [language]);
 
   const selectedDatasetDetail = useMemo(
     () => datasets.find((dataset) => dataset.id === selectedDataset) ?? null,
@@ -613,10 +791,10 @@ export default function App() {
       return models;
     }
     return models.filter((item) => {
-      const content = `${item.model_name} ${item.family} ${FAMILY_LABELS[item.family] ?? ""} ${item.description}`.toLowerCase();
+      const content = `${item.model_name} ${item.family} ${FAMILY_LABELS[language][item.family] ?? ""} ${item.description}`.toLowerCase();
       return content.includes(query);
     });
-  }, [models, modelQuery]);
+  }, [language, models, modelQuery]);
 
   const successfulResultByModel = useMemo(() => {
     const map = new Map<string, ModelResult>();
@@ -715,9 +893,11 @@ export default function App() {
     return toParamTraceRows((championResult.diagnostics as Record<string, unknown>)?.param_trace);
   }, [championResult]);
 
-  const activeMetricGuide = METRIC_FORMULA_GUIDES[metric] ?? METRIC_FORMULA_GUIDES.smape;
-  const activeMetricExcelWorkflow =
-    METRIC_EXCEL_WORKFLOW_GUIDES[metric] ?? METRIC_EXCEL_WORKFLOW_GUIDES.smape;
+  const metricGuideSource = language === "en" ? METRIC_FORMULA_GUIDES_EN : METRIC_FORMULA_GUIDES;
+  const metricExcelSource =
+    language === "en" ? METRIC_EXCEL_WORKFLOW_GUIDES_EN : METRIC_EXCEL_WORKFLOW_GUIDES;
+  const activeMetricGuide = metricGuideSource[metric] ?? metricGuideSource.smape;
+  const activeMetricExcelWorkflow = metricExcelSource[metric] ?? metricExcelSource.smape;
 
   const championMetricScore = useMemo(() => {
     return championResult ? toFiniteNumber(championResult.metrics[metric]) : null;
@@ -746,13 +926,19 @@ export default function App() {
 
     if (championGainVsRunnerUp !== null) {
       actions.push(
-        `相对第二名模型，${metric.toUpperCase()} 下降 ${championGainVsRunnerUp.toFixed(2)}%，可作为当前优先上线候选。`
+        t(
+          `相对第二名模型，${metric.toUpperCase()} 下降 ${championGainVsRunnerUp.toFixed(2)}%，可作为当前优先上线候选。`,
+          `Against the runner-up, ${metric.toUpperCase()} is lower by ${championGainVsRunnerUp.toFixed(2)}%, making this the preferred deployment candidate.`
+        )
       );
     }
 
     if (championGainVsBaseline !== null) {
       actions.push(
-        `相对最佳基线模型，${metric.toUpperCase()} 改善 ${championGainVsBaseline.toFixed(2)}%，说明不是“随机判断”，而是有可量化增益。`
+        t(
+          `相对最佳基线模型，${metric.toUpperCase()} 改善 ${championGainVsBaseline.toFixed(2)}%，说明不是“随机判断”，而是有可量化增益。`,
+          `Against the best baseline, ${metric.toUpperCase()} improved by ${championGainVsBaseline.toFixed(2)}%, indicating measurable gain rather than random variance.`
+        )
       );
     }
 
@@ -772,17 +958,37 @@ export default function App() {
         const ratio = futureAvg / backtestAvg;
         const deltaPct = (ratio - 1) * 100;
         if (ratio >= 1.1) {
-          actions.push(`未来均值需求较最近回测均值上升 ${deltaPct.toFixed(1)}%，建议提前加大补货与产能准备。`);
+          actions.push(
+            t(
+              `未来均值需求较最近回测均值上升 ${deltaPct.toFixed(1)}%，建议提前加大补货与产能准备。`,
+              `Future mean demand is ${deltaPct.toFixed(1)}% above recent backtest mean. Consider increasing replenishment and capacity in advance.`
+            )
+          );
         } else if (ratio <= 0.9) {
-          actions.push(`未来均值需求较最近回测均值下降 ${Math.abs(deltaPct).toFixed(1)}%，建议控制库存水位与采购节奏。`);
+          actions.push(
+            t(
+              `未来均值需求较最近回测均值下降 ${Math.abs(deltaPct).toFixed(1)}%，建议控制库存水位与采购节奏。`,
+              `Future mean demand is ${Math.abs(deltaPct).toFixed(1)}% below recent backtest mean. Consider tightening inventory level and purchasing cadence.`
+            )
+          );
         } else {
-          actions.push("未来需求与近期水平接近，建议维持当前补货策略并持续周度监控。");
+          actions.push(
+            t(
+              "未来需求与近期水平接近，建议维持当前补货策略并持续周度监控。",
+              "Future demand is close to recent level. Keep current replenishment policy and monitor weekly."
+            )
+          );
         }
       }
     }
 
     if (actions.length === 0) {
-      actions.push("当前样本不足以生成自动业务建议，建议先完成阶段1和阶段2后再查看。");
+      actions.push(
+        t(
+          "当前样本不足以生成自动业务建议，建议先完成阶段1和阶段2后再查看。",
+          "Insufficient samples for automated business actions. Complete both Stage 1 and Stage 2 first."
+        )
+      );
     }
 
     return actions;
@@ -791,6 +997,7 @@ export default function App() {
     championGainVsBaseline,
     championGainVsRunnerUp,
     futurePredictionPreview,
+    language,
     metric,
   ]);
 
@@ -856,10 +1063,10 @@ print(scores)`;
     (activeRun && getRunMode(activeRun) === "future_forecast" ? activeRun.summary?.context : undefined);
 
   const championPoints = useMemo(() => toPredictionPoints(championResult), [championResult]);
-  const residualFigure = useMemo(() => buildResidualFigure(championPoints), [championPoints]);
-  const scatterFigure = useMemo(() => buildScatterFigure(championPoints), [championPoints]);
-  const runtimeFigure = useMemo(() => buildRuntimeFigure(evaluationResults), [evaluationResults]);
-  const metricHeatmapFigure = useMemo(() => buildMetricHeatmapFigure(evaluationResults), [evaluationResults]);
+  const residualFigure = useMemo(() => buildResidualFigure(championPoints, language), [championPoints, language]);
+  const scatterFigure = useMemo(() => buildScatterFigure(championPoints, language), [championPoints, language]);
+  const runtimeFigure = useMemo(() => buildRuntimeFigure(evaluationResults, language), [evaluationResults, language]);
+  const metricHeatmapFigure = useMemo(() => buildMetricHeatmapFigure(evaluationResults, language), [evaluationResults, language]);
 
   useEffect(() => {
     void loadInitial();
@@ -931,13 +1138,19 @@ print(scores)`;
                 setResults([]);
                 setViz(null);
                 setMessage(
-                  `阶段1已完成（任务 #${run.id}，冠军模型 ${championName}）。阶段2未来预测任务 #${created.run_id} 已自动启动。`
+                  t(
+                    `阶段1已完成（任务 #${run.id}，冠军模型 ${championName}）。阶段2未来预测任务 #${created.run_id} 已自动启动。`,
+                    `Stage 1 completed (run #${run.id}, champion ${championName}). Stage 2 future forecast run #${created.run_id} has started automatically.`
+                  )
                 );
                 return;
               } catch (autoError) {
                 setPipelineStage("failed");
                 setMessage(
-                  `阶段1已完成，但阶段2自动预测启动失败：${(autoError as Error).message}`
+                  t(
+                    `阶段1已完成，但阶段2自动预测启动失败：${(autoError as Error).message}`,
+                    `Stage 1 completed, but Stage 2 auto forecast failed to start: ${(autoError as Error).message}`
+                  )
                 );
                 return;
               }
@@ -947,7 +1160,10 @@ print(scores)`;
             setResults(rows);
             setViz(charts);
             setMessage(
-              `阶段1已完成（任务 #${run.id}，冠军模型：${run.champion_model ?? "无"}）。当前为仅评估模式，未启动阶段2。`
+              t(
+                `阶段1已完成（任务 #${run.id}，冠军模型：${run.champion_model ?? "无"}）。当前为仅评估模式，未启动阶段2。`,
+                `Stage 1 completed (run #${run.id}, champion: ${run.champion_model ?? "N/A"}). Evaluation-only mode is enabled; Stage 2 was not started.`
+              )
             );
             return;
           }
@@ -961,22 +1177,30 @@ print(scores)`;
           setPipelineStage("completed");
 
           const context = run.summary?.context;
-          const forecastStart = context?.forecast_start ?? "未知";
-          const forecastEnd = context?.forecast_end ?? "未知";
+          const forecastStart = context?.forecast_start ?? t("未知", "unknown");
+          const forecastEnd = context?.forecast_end ?? t("未知", "unknown");
           setMessage(
-            `阶段2已完成（任务 #${run.id}，模型：${run.champion_model ?? "无"}）。未来预测窗口：${forecastStart} 至 ${forecastEnd}。`
+            t(
+              `阶段2已完成（任务 #${run.id}，模型：${run.champion_model ?? "无"}）。未来预测窗口：${forecastStart} 至 ${forecastEnd}。`,
+              `Stage 2 completed (run #${run.id}, model: ${run.champion_model ?? "N/A"}). Forecast window: ${forecastStart} to ${forecastEnd}.`
+            )
           );
         }
 
         if (run.status === "failed") {
           window.clearInterval(timer);
           setPipelineStage("failed");
-          setMessage(`任务 #${activeRunId} 失败：${run.error_message ?? "未知错误"}`);
+          setMessage(
+            t(
+              `任务 #${activeRunId} 失败：${run.error_message ?? "未知错误"}`,
+              `Run #${activeRunId} failed: ${run.error_message ?? "unknown error"}`
+            )
+          );
         }
       } catch (error) {
         window.clearInterval(timer);
         setPipelineStage("failed");
-        setMessage(`轮询任务状态失败：${(error as Error).message}`);
+        setMessage(t(`轮询任务状态失败：${(error as Error).message}`, `Failed to poll run status: ${(error as Error).message}`));
       }
     }, 3000);
 
@@ -1025,12 +1249,12 @@ print(scores)`;
 
   async function onUpload() {
     if (!file) {
-      setMessage("请先选择 CSV 文件。可直接使用下方 Demo 一键加载。 ");
+      setMessage(t("请先选择 CSV 文件。可直接使用下方 Demo 一键加载。", "Please select a CSV file first. You can also load the Demo dataset below."));
       return;
     }
 
     setLoading(true);
-    setMessage("正在上传数据集...");
+    setMessage(t("正在上传数据集...", "Uploading dataset..."));
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -1043,9 +1267,9 @@ print(scores)`;
       const row = await uploadDataset(fd);
       upsertDataset(row);
       setSelectedDataset(row.id);
-      setMessage(`数据集上传成功：${row.name}`);
+      setMessage(t(`数据集上传成功：${row.name}`, `Dataset uploaded: ${row.name}`));
     } catch (error) {
-      setMessage(`上传失败：${(error as Error).message}`);
+      setMessage(t(`上传失败：${(error as Error).message}`, `Upload failed: ${(error as Error).message}`));
     } finally {
       setLoading(false);
     }
@@ -1053,7 +1277,7 @@ print(scores)`;
 
   async function onCreateDemoDataset() {
     setLoading(true);
-    setMessage("正在加载内置 Demo 数据...");
+    setMessage(t("正在加载内置 Demo 数据...", "Loading built-in demo dataset..."));
     try {
       const row = await createDemoDataset();
       upsertDataset(row);
@@ -1062,9 +1286,9 @@ print(scores)`;
       setTargetCol("销量");
       setItemCol("商品编码");
       setFreq("D");
-      setMessage("Demo 数据已加载，可直接点击“开始预测”或“一键跑 Demo”。");
+      setMessage(t("Demo 数据已加载，可直接点击“开始预测”或“一键跑 Demo”。", "Demo dataset loaded. You can start forecasting immediately."));
     } catch (error) {
-      setMessage(`加载 Demo 失败：${(error as Error).message}`);
+      setMessage(t(`加载 Demo 失败：${(error as Error).message}`, `Failed to load demo dataset: ${(error as Error).message}`));
     } finally {
       setLoading(false);
     }
@@ -1072,7 +1296,7 @@ print(scores)`;
 
   async function onRunDemoDirectly() {
     setLoading(true);
-    setMessage("正在初始化 Demo 并启动阶段1模型选优...");
+    setMessage(t("正在初始化 Demo 并启动阶段1模型选优...", "Initializing demo and starting Stage 1 model selection..."));
     try {
       const demoDataset = await createDemoDataset();
       upsertDataset(demoDataset);
@@ -1111,12 +1335,15 @@ print(scores)`;
       setViz(null);
       setMessage(
         autoForecastEnabled
-          ? `阶段1任务 #${created.run_id} 已启动。完成后将自动进入阶段2未来预测。`
-          : `阶段1任务 #${created.run_id} 已启动。当前为仅评估模式。`
+          ? t(
+              `阶段1任务 #${created.run_id} 已启动。完成后将自动进入阶段2未来预测。`,
+              `Stage 1 run #${created.run_id} started. It will automatically continue to Stage 2 when done.`
+            )
+          : t(`阶段1任务 #${created.run_id} 已启动。当前为仅评估模式。`, `Stage 1 run #${created.run_id} started. Evaluation-only mode is enabled.`)
       );
     } catch (error) {
       setPipelineStage("failed");
-      setMessage(`一键跑 Demo 失败：${(error as Error).message}`);
+      setMessage(t(`一键跑 Demo 失败：${(error as Error).message}`, `Run Demo failed: ${(error as Error).message}`));
     } finally {
       setLoading(false);
     }
@@ -1131,12 +1358,12 @@ print(scores)`;
 
   async function onRun() {
     if (!selectedDataset) {
-      setMessage("请先选择一个数据集。可点击“一键加载 Demo 数据”。");
+      setMessage(t("请先选择一个数据集。可点击“一键加载 Demo 数据”。", "Please select a dataset first. You can load the Demo dataset with one click."));
       return;
     }
 
     setLoading(true);
-    setMessage("正在创建阶段1模型选优任务...");
+    setMessage(t("正在创建阶段1模型选优任务...", "Creating Stage 1 model selection run..."));
     try {
       setSelectionRunId(null);
       setSelectionRun(null);
@@ -1167,12 +1394,15 @@ print(scores)`;
       setViz(null);
       setMessage(
         autoForecastEnabled
-          ? `阶段1任务 #${created.run_id} 已启动。完成后将自动进入阶段2未来预测。`
-          : `阶段1任务 #${created.run_id} 已启动。当前为仅评估模式。`
+          ? t(
+              `阶段1任务 #${created.run_id} 已启动。完成后将自动进入阶段2未来预测。`,
+              `Stage 1 run #${created.run_id} started. It will automatically continue to Stage 2 when done.`
+            )
+          : t(`阶段1任务 #${created.run_id} 已启动。当前为仅评估模式。`, `Stage 1 run #${created.run_id} started. Evaluation-only mode is enabled.`)
       );
     } catch (error) {
       setPipelineStage("failed");
-      setMessage(`创建任务失败：${(error as Error).message}`);
+      setMessage(t(`创建任务失败：${(error as Error).message}`, `Failed to create run: ${(error as Error).message}`));
     } finally {
       setLoading(false);
     }
@@ -1182,77 +1412,100 @@ print(scores)`;
     <div className="app-shell">
       <header className="hero">
         <p className="kicker">Enterprise Forecasting Platform</p>
-        <h1>需求预测 Demo 工作台</h1>
+        <div className="hero-top-row">
+          <h1>{t("需求预测 Demo 工作台", "Demand Forecast Demo Workbench")}</h1>
+          <div className="lang-switch">
+            <button
+              type="button"
+              className={`lang-btn ${language === "zh" ? "active" : ""}`}
+              onClick={() => setLanguage("zh")}
+            >
+              中文
+            </button>
+            <button
+              type="button"
+              className={`lang-btn ${language === "en" ? "active" : ""}`}
+              onClick={() => setLanguage("en")}
+            >
+              EN
+            </button>
+          </div>
+        </div>
         <p>
-          支持一键加载中文 Demo、自动训练对比多模型、自动调参、输出排行榜与冠军模型可视化。
-          页面中的字段与输入参数均提供中文解释，便于业务与技术团队协作。
+          {t(
+            "支持一键加载中文 Demo、自动训练对比多模型、自动调参、输出排行榜与冠军模型可视化。页面中的字段与输入参数均提供中文解释，便于业务与技术团队协作。",
+            "Load demo data in one click, benchmark many models automatically, tune hyperparameters, and visualize leaderboard/champion outputs. Core fields and inputs support bilingual guidance for business and engineering collaboration."
+          )}
         </p>
       </header>
 
       <main className="grid">
         <section className="card">
-          <h3>1) 数据接入（支持中文字段）</h3>
+          <h3>{t("1) 数据接入（支持中文字段）", "1) Data Ingestion")}</h3>
           <p className="section-desc">
-            说明：如果你想立刻体验，请直接点击下方“加载 Demo”或“一键跑 Demo”。
+            {t(
+              "说明：如果你想立刻体验，请直接点击下方“加载 Demo”或“一键跑 Demo”。",
+              "Tip: to start instantly, click 'Load Demo Dataset' or 'Run Demo Now'."
+            )}
           </p>
           <div className="form-grid">
             <label>
-              CSV 文件（file）
-              <span className="help-text">上传历史需求数据文件，建议 UTF-8 编码。</span>
+              {t("CSV 文件（file）", "CSV File (file)")}
+              <span className="help-text">{t("上传历史需求数据文件，建议 UTF-8 编码。", "Upload historical demand CSV (UTF-8 recommended).")}</span>
               <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             </label>
             <label>
-              数据集名称（name）
-              <span className="help-text">可选。用于区分不同批次数据集。</span>
+              {t("数据集名称（name）", "Dataset Name (name)")}
+              <span className="help-text">{t("可选。用于区分不同批次数据集。", "Optional. Helps separate different dataset batches.")}</span>
               <input
                 value={datasetName}
                 onChange={(e) => setDatasetName(e.target.value)}
-                placeholder="例如：华东门店日销量"
+                placeholder={t("例如：华东门店日销量", "Example: East Region Daily Sales")}
               />
             </label>
             <label>
-              时间列（time_col）
-              <span className="help-text">表示日期时间的字段名，例如“日期”或“ds”。</span>
+              {t("时间列（time_col）", "Time Column (time_col)")}
+              <span className="help-text">{t("表示日期时间的字段名，例如“日期”或“ds”。", "Datetime field name, e.g. 日期 or ds.")}</span>
               <input value={timeCol} onChange={(e) => setTimeCol(e.target.value)} />
             </label>
             <label>
-              目标列（target_col）
-              <span className="help-text">实际需求量字段名，例如“销量”或“y”。</span>
+              {t("目标列（target_col）", "Target Column (target_col)")}
+              <span className="help-text">{t("实际需求量字段名，例如“销量”或“y”。", "Actual demand field, e.g. 销量 or y.")}</span>
               <input value={targetCol} onChange={(e) => setTargetCol(e.target.value)} />
             </label>
             <label>
-              序列列（item_col，可选）
-              <span className="help-text">多商品/门店场景下用于区分序列，例如“商品编码”。</span>
-              <input value={itemCol} onChange={(e) => setItemCol(e.target.value)} placeholder="例如：商品编码" />
+              {t("序列列（item_col，可选）", "Series Column (item_col, optional)")}
+              <span className="help-text">{t("多商品/门店场景下用于区分序列，例如“商品编码”。", "Series identifier for multi-item/store data, e.g. 商品编码.")}</span>
+              <input value={itemCol} onChange={(e) => setItemCol(e.target.value)} placeholder={t("例如：商品编码", "Example: item_code")} />
             </label>
             <label>
-              频率（freq）
-              <span className="help-text">D=日，W=周，M=月。与业务统计口径保持一致。</span>
+              {t("频率（freq）", "Frequency (freq)")}
+              <span className="help-text">{t("D=日，W=周，M=月。与业务统计口径保持一致。", "D=daily, W=weekly, M=monthly.")}</span>
               <input value={freq} onChange={(e) => setFreq(e.target.value)} placeholder="D / W / M" />
             </label>
           </div>
           <div className="button-row">
             <button disabled={loading} onClick={() => void onUpload()}>
-              上传自有数据
+              {t("上传自有数据", "Upload CSV")}
             </button>
             <button className="btn-secondary" disabled={loading} onClick={() => void onCreateDemoDataset()}>
-              加载 Demo 数据
+              {t("加载 Demo 数据", "Load Demo Dataset")}
             </button>
             <button className="btn-secondary" disabled={loading} onClick={() => void onRunDemoDirectly()}>
-              一键跑 Demo
+              {t("一键跑 Demo", "Run Demo Now")}
             </button>
           </div>
         </section>
 
         <section className="card">
-          <h3>2) 模型范围（中文分类）</h3>
+          <h3>{t("2) 模型范围（中文分类）", "2) Model Scope")}</h3>
           <p className="section-desc">
-            说明：可以自动跑全模型，也可以手动选择模型集合做快速实验。
+            {t("说明：可以自动跑全模型，也可以手动选择模型集合做快速实验。", "Run all models automatically or pick a subset for rapid experiments.")}
           </p>
           <div className="family-stats">
             {Object.entries(modelCountByFamily).map(([family, count]) => (
               <span key={family} className="pill">
-                {FAMILY_LABELS[family] ?? family}: {count}
+                {FAMILY_LABELS[language][family] ?? family}: {count}
               </span>
             ))}
           </div>
@@ -1262,12 +1515,12 @@ print(scores)`;
               checked={useAllModels}
               onChange={(e) => setUseAllModels(e.target.checked)}
             />
-            自动对比全部模型（全面评估）
+            {t("自动对比全部模型（全面评估）", "Compare all models automatically")}
           </label>
 
           <label>
-            算法搜索（用于模型选择与知识中心）
-            <span className="help-text">支持按模型名、分类、描述关键字筛选。</span>
+            {t("算法搜索（用于模型选择与知识中心）", "Model Search (selection + knowledge hub)")}
+            <span className="help-text">{t("支持按模型名、分类、描述关键字筛选。", "Filter by model name, family, or description keywords.")}</span>
             <input
               value={modelQuery}
               onChange={(e) => setModelQuery(e.target.value)}
@@ -1288,19 +1541,22 @@ print(scores)`;
                 </label>
               ))}
               {filteredModels.length === 0 && (
-                <p className="muted">未找到匹配模型，请调整检索词。</p>
+                <p className="muted">{t("未找到匹配模型，请调整检索词。", "No model matched the search term.")}</p>
               )}
             </div>
           )}
         </section>
 
         <section className="card full-width">
-          <h3>3) 业务落地知识中心（函数包 + 更新公式 + Python/Excel 复现）</h3>
+          <h3>{t("3) 业务落地知识中心（函数包 + 更新公式 + Python/Excel 复现）", "3) Knowledge Hub (Packages + Formulas + Python/Excel Reproduction)")}</h3>
           <p className="section-desc">
-            说明：每个算法都展示业务逻辑、可直接调用函数包、可渲染数学公式、状态更新方程、参数释义、数学推导步骤、底层 Python 实现和 Excel 复核路径，确保可讲清、可复验、可落地。
+            {t(
+              "说明：每个算法都展示业务逻辑、可直接调用函数包、可渲染数学公式、状态更新方程、参数释义、数学推导步骤、底层 Python 实现和 Excel 复核路径，确保可讲清、可复验、可落地。",
+              "Each model shows business logic, callable packages, rendered formulas, state-update equations, parameter notes, mathematical workflows, Python implementation, and Excel validation path."
+            )}
           </p>
           <p className="muted">
-            当前显示 {filteredModels.length} / {models.length} 个模型。点击卡片可展开详细内容。
+            {t("当前显示", "Showing")} {filteredModels.length} / {models.length} {t("个模型。点击卡片可展开详细内容。", "models. Click a card to expand details.")}
           </p>
 
           <div className="knowledge-grid">
@@ -1325,17 +1581,17 @@ print(scores)`;
                   <summary>
                     <div className="knowledge-head">
                       <div>
-                        <p className="label">算法名称</p>
+                        <p className="label">{t("算法名称", "Model Name")}</p>
                         <h4>{model.model_name}</h4>
                       </div>
-                      <span className="pill">{FAMILY_LABELS[model.family] ?? model.family}</span>
+                      <span className="pill">{FAMILY_LABELS[language][model.family] ?? model.family}</span>
                     </div>
                     <p className="muted">{knowledge.overview}</p>
                   </summary>
 
                   <div className="knowledge-body">
                     <p>
-                      <strong>算法逻辑：</strong>
+                      <strong>{t("算法逻辑：", "Model logic:")}</strong>
                     </p>
                     <ul className="knowledge-list">
                       {logicItems.map((item, index) => (
@@ -1344,7 +1600,7 @@ print(scores)`;
                     </ul>
 
                     <div className="knowledge-section">
-                      <p className="label">函数包（可直接调用）</p>
+                      <p className="label">{t("函数包（可直接调用）", "Function packages")}</p>
                       <ul className="knowledge-list">
                         {functionPackageItems.map((item, index) => (
                           <li key={`${model.model_name}-pkg-${index}`}>
@@ -1355,7 +1611,7 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">核心公式</p>
+                      <p className="label">{t("核心公式", "Core formulas")}</p>
                       <div className="markdown-math-list">
                         {formulaItems.map((item, index) => (
                           <div className="math-block" key={`${model.model_name}-formula-${index}`}>
@@ -1366,7 +1622,7 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">状态更新公式（递推）</p>
+                      <p className="label">{t("状态更新公式（递推）", "State update equations")}</p>
                       <div className="markdown-math-list">
                         {updateEquationItems.map((item, index) => (
                           <div className="math-block" key={`${model.model_name}-update-eq-${index}`}>
@@ -1377,15 +1633,15 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">公式参数解释（符号 - 含义 - 业务取值）</p>
+                      <p className="label">{t("公式参数解释（符号 - 含义 - 业务取值）", "Formula parameters (symbol - meaning - business value)")}</p>
                       {knowledge.formulaParameters.length > 0 ? (
                         <div className="table-wrap compact-table">
                           <table>
                             <thead>
                               <tr>
-                                <th>符号</th>
-                                <th>含义</th>
-                                <th>业务取值建议</th>
+                                <th>{t("符号", "Symbol")}</th>
+                                <th>{t("含义", "Meaning")}</th>
+                                <th>{t("业务取值建议", "Business guidance")}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1400,12 +1656,12 @@ print(scores)`;
                           </table>
                         </div>
                       ) : (
-                        <p className="muted">该算法没有固定闭式公式，请参考下方 Python 步骤复现。</p>
+                        <p className="muted">{t("该算法没有固定闭式公式，请参考下方 Python 步骤复现。", "No fixed closed-form formula is provided for this model. Refer to the Python workflow below.")}</p>
                       )}
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">数学推导步骤（可人工验算）</p>
+                      <p className="label">{t("数学推导步骤（可人工验算）", "Math derivation steps")}</p>
                       <ol className="guide-list">
                         {knowledge.mathWorkflow.map((workflowItem, index) => (
                           <li key={`${model.model_name}-math-${index}`}>
@@ -1416,7 +1672,7 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">手算示例（代入具体数字）</p>
+                      <p className="label">{t("手算示例（代入具体数字）", "Manual calculation example")}</p>
                       <ol className="guide-list">
                         {knowledge.manualCalculationSteps.map((workflowItem, index) => (
                           <li key={`${model.model_name}-manual-calc-${index}`}>
@@ -1427,7 +1683,7 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">具体例子</p>
+                      <p className="label">{t("具体例子", "Examples")}</p>
                       <ul className="knowledge-list">
                         {exampleItems.map((item, index) => (
                           <li key={`${model.model_name}-example-${index}`}>{item}</li>
@@ -1436,16 +1692,16 @@ print(scores)`;
                     </div>
 
                     <p>
-                      <strong>模型概览：</strong>
+                      <strong>{t("模型概览：", "Overview:")}</strong>
                       {knowledge.overview}
                     </p>
                     <p>
-                      <strong>基础描述：</strong>
+                      <strong>{t("基础描述：", "Description:")}</strong>
                       {model.description}
                     </p>
 
                     <div className="knowledge-section">
-                      <p className="label">参数解释</p>
+                      <p className="label">{t("参数解释", "Parameter notes")}</p>
                       {paramEntries.length > 0 ? (
                         <ul className="knowledge-list">
                           {paramEntries.map(([key, value]) => (
@@ -1455,12 +1711,12 @@ print(scores)`;
                           ))}
                         </ul>
                       ) : (
-                        <p className="muted">暂无预置参数解释。</p>
+                        <p className="muted">{t("暂无预置参数解释。", "No preset parameter notes.")}</p>
                       )}
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">默认参数参考值</p>
+                      <p className="label">{t("默认参数参考值", "Default parameters")}</p>
                       {defaultEntries.length > 0 ? (
                         <div className="param-pills">
                           {defaultEntries.map(([key, value]) => (
@@ -1470,12 +1726,12 @@ print(scores)`;
                           ))}
                         </div>
                       ) : (
-                        <p className="muted">该模型没有默认参数配置。</p>
+                        <p className="muted">{t("该模型没有默认参数配置。", "This model has no default parameter config.")}</p>
                       )}
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">可调参数搜索空间</p>
+                      <p className="label">{t("可调参数搜索空间", "Tunable parameter search space")}</p>
                       {tunableEntries.length > 0 ? (
                         <div className="param-pills">
                           {tunableEntries.map(([key, value]) => (
@@ -1485,12 +1741,12 @@ print(scores)`;
                           ))}
                         </div>
                       ) : (
-                        <p className="muted">该模型当前未配置自动调参搜索空间。</p>
+                        <p className="muted">{t("该模型当前未配置自动调参搜索空间。", "No auto-tuning search space is configured for this model.")}</p>
                       )}
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">本次运行得到的模型参数</p>
+                      <p className="label">{t("本次运行得到的模型参数", "Model params from this run")}</p>
                       {runResult ? (
                         <>
                           {trainedParamEntries.length > 0 ? (
@@ -1502,7 +1758,7 @@ print(scores)`;
                               ))}
                             </div>
                           ) : (
-                            <p className="muted">本次运行未返回该模型参数明细。</p>
+                            <p className="muted">{t("本次运行未返回该模型参数明细。", "This run did not return detailed model params.")}</p>
                           )}
 
                           {modelMetricEntries.length > 0 && (
@@ -1516,12 +1772,12 @@ print(scores)`;
                           )}
                         </>
                       ) : (
-                        <p className="muted">该模型尚未产出结果。先运行一次任务后会显示训练后的实际参数。</p>
+                        <p className="muted">{t("该模型尚未产出结果。先运行一次任务后会显示训练后的实际参数。", "This model has no run result yet. Run a task to view trained params.")}</p>
                       )}
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">Python 落地步骤（可在本机复现）</p>
+                      <p className="label">{t("Python 落地步骤（可在本机复现）", "Python implementation workflow")}</p>
                       <ol className="guide-list">
                         {knowledge.pythonWorkflow.map((workflowItem) => (
                           <li key={`${model.model_name}-workflow-${workflowItem.step}`}>
@@ -1532,12 +1788,12 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">底层 Python 参考实现（核心计算逻辑）</p>
+                      <p className="label">{t("底层 Python 参考实现（核心计算逻辑）", "Python reference implementation")}</p>
                       <pre className="code-block">{knowledge.pythonReferenceCode}</pre>
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">Excel 复现路径（便于业务同学验算）</p>
+                      <p className="label">{t("Excel 复现路径（便于业务同学验算）", "Excel reproduction workflow")}</p>
                       <ol className="guide-list">
                         {knowledge.excelWorkflow.map((workflowItem, index) => (
                           <li key={`${model.model_name}-excel-${index}`}>
@@ -1548,7 +1804,7 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">可复现检查清单</p>
+                      <p className="label">{t("可复现检查清单", "Reproducibility checklist")}</p>
                       <ul className="knowledge-list">
                         {knowledge.reproducibilityChecklist.map((checkItem, index) => (
                           <li key={`${model.model_name}-check-${index}`}>{checkItem}</li>
@@ -1557,16 +1813,16 @@ print(scores)`;
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">阶段1回测样例（前 5 条）</p>
+                      <p className="label">{t("阶段1回测样例（前 5 条）", "Stage 1 backtest samples (top 5)")}</p>
                       {predictionPreviewRows.length > 0 ? (
                         <div className="table-wrap compact-table">
                           <table>
                             <thead>
                               <tr>
-                                <th>日期</th>
-                                <th>序列</th>
-                                <th>预测值 y_pred</th>
-                                <th>实际值 y</th>
+                                <th>{t("日期", "Date")}</th>
+                                <th>{t("序列", "Series")}</th>
+                                <th>{t("预测值 y_pred", "Predicted y_pred")}</th>
+                                <th>{t("实际值 y", "Actual y")}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1582,12 +1838,12 @@ print(scores)`;
                           </table>
                         </div>
                       ) : (
-                        <p className="muted">暂无样例预测值。先完成阶段1后，这里会显示该模型的回测结果。</p>
+                        <p className="muted">{t("暂无样例预测值。先完成阶段1后，这里会显示该模型的回测结果。", "No sample predictions yet. Run Stage 1 to show this model's backtest output.")}</p>
                       )}
                     </div>
 
                     <div className="knowledge-section">
-                      <p className="label">调参建议</p>
+                      <p className="label">{t("调参建议", "Tuning tips")}</p>
                       <ul className="knowledge-list">
                         {tipItems.map((item, index) => (
                           <li key={`${model.model_name}-tip-${index}`}>{item}</li>
@@ -1613,33 +1869,33 @@ print(scores)`;
             })}
           </div>
 
-          {filteredModels.length === 0 && <p className="muted">未匹配到算法，请更换搜索关键词。</p>}
+          {filteredModels.length === 0 && <p className="muted">{t("未匹配到算法，请更换搜索关键词。", "No model matched. Try another keyword.")}</p>}
         </section>
 
         <section className="card full-width">
-          <h3>4) Demo 数据内容与中文字段解释</h3>
+          <h3>{t("4) Demo 数据内容与中文字段解释", "4) Demo Data Preview & Field Explanation")}</h3>
           {selectedDatasetDetail ? (
             <div className="dataset-meta">
               <p>
-                当前数据集：<strong>{selectedDatasetDetail.name}</strong>（ID: {selectedDatasetDetail.id}）
+                {t("当前数据集：", "Current dataset:")}<strong>{selectedDatasetDetail.name}</strong>（ID: {selectedDatasetDetail.id}）
               </p>
               <div className="meta-grid">
-                <span className="pill">时间列: {selectedDatasetDetail.time_col}</span>
-                <span className="pill">目标列: {selectedDatasetDetail.target_col}</span>
-                <span className="pill">序列列: {selectedDatasetDetail.item_col ?? "未设置"}</span>
-                <span className="pill">频率: {selectedDatasetDetail.freq}</span>
+                <span className="pill">{t("时间列", "Time")}: {selectedDatasetDetail.time_col}</span>
+                <span className="pill">{t("目标列", "Target")}: {selectedDatasetDetail.target_col}</span>
+                <span className="pill">{t("序列列", "Series")}: {selectedDatasetDetail.item_col ?? t("未设置", "not set")}</span>
+                <span className="pill">{t("频率", "Frequency")}: {selectedDatasetDetail.freq}</span>
               </div>
             </div>
           ) : (
-            <p className="muted">尚未选择数据集。</p>
+            <p className="muted">{t("尚未选择数据集。", "No dataset selected.")}</p>
           )}
 
-          {previewLoading && <p className="muted">正在加载数据预览...</p>}
+          {previewLoading && <p className="muted">{t("正在加载数据预览...", "Loading dataset preview...")}</p>}
 
           {!previewLoading && datasetPreview && (
             <>
               <p className="muted">
-                数据总行数：{datasetPreview.total_rows}，当前展示前 {datasetPreview.shown_rows} 行。
+                {t("数据总行数", "Total rows")}: {datasetPreview.total_rows}，{t("当前展示前", "showing first")} {datasetPreview.shown_rows} {t("行", "rows")}。
               </p>
               <div className="table-wrap">
                 <table>
@@ -1665,8 +1921,11 @@ print(scores)`;
               <div className="explain-grid">
                 {datasetPreview.columns.map((col) => (
                   <div className="explain-item" key={`explain-${col}`}>
-                    <p className="label">字段：{col}</p>
-                    <p className="muted">{COLUMN_EXPLANATIONS[col] ?? "该字段暂无预置说明，可按业务自行补充。"}</p>
+                    <p className="label">{t("字段", "Field")}: {col}</p>
+                    <p className="muted">
+                      {COLUMN_EXPLANATIONS[language][col] ??
+                        t("该字段暂无预置说明，可按业务自行补充。", "No preset explanation for this field.")}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -1674,22 +1933,22 @@ print(scores)`;
           )}
 
           {!previewLoading && !datasetPreview && (
-            <p className="muted">暂无数据预览。请上传数据或加载 Demo。</p>
+            <p className="muted">{t("暂无数据预览。请上传数据或加载 Demo。", "No preview available yet. Upload a dataset or load Demo.")}</p>
           )}
         </section>
 
         <section className="card">
-          <h3>5) 预测参数配置（中文解释）</h3>
+          <h3>{t("5) 预测参数配置（中文解释）", "5) Forecast Configuration")}</h3>
           <div className="form-grid">
             <label>
-              数据集（dataset_id）
-              <span className="help-text">选择要建模的数据集。</span>
+              {t("数据集（dataset_id）", "Dataset (dataset_id)")}
+              <span className="help-text">{t("选择要建模的数据集。", "Choose the dataset for modeling.")}</span>
               <select
                 value={selectedDataset ?? ""}
                 onChange={(e) => setSelectedDataset(Number(e.target.value))}
               >
                 <option value="" disabled>
-                  请选择数据集
+                  {t("请选择数据集", "Select a dataset")}
                 </option>
                 {datasets.map((dataset) => (
                   <option key={dataset.id} value={dataset.id}>
@@ -1699,8 +1958,8 @@ print(scores)`;
               </select>
             </label>
             <label>
-              预测步长（horizon）
-              <span className="help-text">向未来预测多少期，日频下通常为 7/14/30 天。</span>
+              {t("预测步长（horizon）", "Forecast Horizon (horizon)")}
+              <span className="help-text">{t("向未来预测多少期，日频下通常为 7/14/30 天。", "How many periods to predict ahead. Common daily values: 7/14/30.")}</span>
               <input
                 type="number"
                 min={1}
@@ -1710,10 +1969,10 @@ print(scores)`;
               />
             </label>
             <label>
-              优化指标（metric）
-              <span className="help-text">用于模型排序与冠军模型选择的指标。</span>
+              {t("优化指标（metric）", "Optimization Metric (metric)")}
+              <span className="help-text">{t("用于模型排序与冠军模型选择的指标。", "Metric used to rank models and pick champion.")}</span>
               <select value={metric} onChange={(e) => setMetric(e.target.value)}>
-                {METRIC_OPTIONS.map((item) => (
+                {METRIC_OPTIONS[language].map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
@@ -1721,8 +1980,8 @@ print(scores)`;
               </select>
             </label>
             <label>
-              调参轮次（tune_trials）
-              <span className="help-text">数值越大越可能找到好参数，但耗时更长。</span>
+              {t("调参轮次（tune_trials）", "Tuning Trials (tune_trials)")}
+              <span className="help-text">{t("数值越大越可能找到好参数，但耗时更长。", "More trials may find better params but takes longer.")}</span>
               <input
                 type="number"
                 min={0}
@@ -1738,93 +1997,100 @@ print(scores)`;
               checked={autoForecastEnabled}
               onChange={(e) => setAutoForecastEnabled(e.target.checked)}
             />
-            启用两阶段串行（先选优，再未来预测；严格串行，不并行）
+            {t("启用两阶段串行（先选优，再未来预测；严格串行，不并行）", "Enable two-stage flow (selection first, then future forecast)")}
           </label>
           <button disabled={loading} onClick={() => void onRun()}>
-            {autoForecastEnabled ? "开始串行预测（先选优后未来预测）" : "开始评估（仅阶段1选优）"}
+            {autoForecastEnabled
+              ? t("开始串行预测（先选优后未来预测）", "Start two-stage forecast")
+              : t("开始评估（仅阶段1选优）", "Start evaluation (Stage 1 only)")}
           </button>
           <p className="muted">{message}</p>
         </section>
 
         <section className="card">
-          <h3>6) 任务状态</h3>
+          <h3>{t("6) 任务状态", "6) Run Status")}</h3>
           <div className="status-grid">
             <div>
-              <p className="label">流程阶段</p>
-              <p>{PIPELINE_STAGE_LABEL[pipelineStage]}</p>
+              <p className="label">{t("流程阶段", "Pipeline stage")}</p>
+              <p>{PIPELINE_STAGE_LABEL[language][pipelineStage]}</p>
             </div>
             <div>
-              <p className="label">阶段1任务ID（选优）</p>
+              <p className="label">{t("阶段1任务ID（选优）", "Stage 1 Run ID")}</p>
               <p>{selectionRunId ? `#${selectionRunId}` : "-"}</p>
             </div>
             <div>
-              <p className="label">阶段2任务ID（未来预测）</p>
+              <p className="label">{t("阶段2任务ID（未来预测）", "Stage 2 Run ID")}</p>
               <p>{futureRunId ? `#${futureRunId}` : "-"}</p>
             </div>
             <div>
-              <p className="label">当前活跃任务</p>
+              <p className="label">{t("当前活跃任务", "Active Run")}</p>
               <p>{activeRun ? `#${activeRun.id} (${activeRun.status})` : "-"}</p>
             </div>
           </div>
 
           {futureWindow?.forecast_start && futureWindow?.forecast_end && (
             <p className="muted">
-              未来预测窗口：{futureWindow.forecast_start} 至 {futureWindow.forecast_end}，
-              步长 {futureWindow.horizon ?? "-"}，频率 {futureWindow.freq ?? "-"}。
+              {t("未来预测窗口", "Forecast window")}: {futureWindow.forecast_start} {t("至", "to")} {futureWindow.forecast_end}，
+              {t("步长", "horizon")} {futureWindow.horizon ?? "-"}，{t("频率", "frequency")} {futureWindow.freq ?? "-"}。
             </p>
           )}
 
-          {!activeRun && pipelineStage === "idle" && <p className="muted">暂无运行中的任务。</p>}
+          {!activeRun && pipelineStage === "idle" && <p className="muted">{t("暂无运行中的任务。", "No active run.")}</p>}
         </section>
 
         <section className="card full-width">
-          <h3>7) 冠军模型业务决策链（参数 + 公式 + 可复现）</h3>
+          <h3>{t("7) 冠军模型业务决策链（参数 + 公式 + 可复现）", "7) Champion Model Decision Trace (Params + Formula + Reproducibility)")}</h3>
           {championModelSpec && championKnowledge ? (
             <>
               <p>
-                当前冠军模型：<strong>{championModelSpec.model_name}</strong>
-                （{FAMILY_LABELS[championModelSpec.family] ?? championModelSpec.family}）
+                {t("当前冠军模型", "Current champion")}: <strong>{championModelSpec.model_name}</strong>
+                （{FAMILY_LABELS[language][championModelSpec.family] ?? championModelSpec.family}）
               </p>
               <p className="muted">
-                下面展示的是阶段1选优得到的冠军模型参数、选型依据和业务动作建议，确保过程可审计、可解释、可复现。
+                {t(
+                  "下面展示的是阶段1选优得到的冠军模型参数、选型依据和业务动作建议，确保过程可审计、可解释、可复现。",
+                  "Below are the champion parameters, selection rationale, and business actions from Stage 1, designed for auditability, interpretability, and reproducibility."
+                )}
               </p>
 
               {championModelSpec.model_name === "AutoETS" && (
                 <div className="focus-box">
                   <p>
                     <strong>AutoETS 读法（示例）：</strong>
-                    如果你看到参数 season_length = 7，表示模型按 7 天一个周期学习季节性。
-                    日频业务里通常对应“周内模式”。
+                    {t(
+                      "如果你看到参数 season_length = 7，表示模型按 7 天一个周期学习季节性。日频业务里通常对应“周内模式”。",
+                      "If season_length = 7, the model learns weekly seasonality with a 7-day cycle for daily data."
+                    )}
                   </p>
                 </div>
               )}
 
               <div className="knowledge-section">
-                <p className="label">为什么它是冠军模型</p>
+                <p className="label">{t("为什么它是冠军模型", "Why this model is the champion")}</p>
                 <ul className="knowledge-list">
                   <li>
-                    本次按 <strong>{metric.toUpperCase()}</strong> 指标选优，冠军得分为
-                    <strong> {championMetricScore !== null ? championMetricScore.toFixed(4) : "-"}</strong>（越小越好）。
+                    {t("本次按", "This run selects by")} <strong>{metric.toUpperCase()}</strong> {t("指标，冠军得分为", "metric. Champion score:")}
+                    <strong> {championMetricScore !== null ? championMetricScore.toFixed(4) : "-"}</strong> {t("（越小越好）。", "(lower is better).")}
                   </li>
                   <li>
-                    相对第二名模型：
+                    {t("相对第二名模型：", "Against runner-up:")}
                     {championGainVsRunnerUp !== null
-                      ? `指标改善 ${championGainVsRunnerUp.toFixed(2)}%`
-                      : "当前样本不足，无法计算改善率"}
+                      ? t(`指标改善 ${championGainVsRunnerUp.toFixed(2)}%`, `metric improved by ${championGainVsRunnerUp.toFixed(2)}%`)
+                      : t("当前样本不足，无法计算改善率", "insufficient samples to compute improvement")}
                     。
                   </li>
                   <li>
-                    相对最佳基线模型：
+                    {t("相对最佳基线模型：", "Against best baseline:")}
                     {championGainVsBaseline !== null
-                      ? `指标改善 ${championGainVsBaseline.toFixed(2)}%`
-                      : "当前无可比较基线"}
+                      ? t(`指标改善 ${championGainVsBaseline.toFixed(2)}%`, `metric improved by ${championGainVsBaseline.toFixed(2)}%`)
+                      : t("当前无可比较基线", "no comparable baseline")}
                     。
                   </li>
                 </ul>
               </div>
 
               <div className="knowledge-section">
-                <p className="label">当前选优指标公式与参数解释</p>
+                <p className="label">{t("当前选优指标公式与参数解释", "Current metric formula and parameter notes")}</p>
                 <div className="math-block">
                   <MarkdownMath content={activeMetricGuide.formula} className="markdown-content" />
                 </div>
@@ -1834,7 +2100,7 @@ print(scores)`;
                     <thead>
                       <tr>
                         <th>符号</th>
-                        <th>含义</th>
+                        <th>{t("含义", "Meaning")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1850,15 +2116,15 @@ print(scores)`;
               </div>
 
               <div className="knowledge-section">
-                <p className="label">这个冠军模型的参数是什么</p>
+                <p className="label">{t("这个冠军模型的参数是什么", "Champion model parameters")}</p>
                 {championParamEntries.length > 0 ? (
                   <div className="table-wrap compact-table">
                     <table>
                       <thead>
                         <tr>
-                          <th>参数</th>
-                          <th>当前值</th>
-                          <th>通俗解释</th>
+                          <th>{t("参数", "Parameter")}</th>
+                          <th>{t("当前值", "Current value")}</th>
+                          <th>{t("通俗解释", "Explanation")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1866,14 +2132,14 @@ print(scores)`;
                           <tr key={`champion-param-${key}`}>
                             <td>{key}</td>
                             <td>{formatParamValue(value)}</td>
-                            <td>{championKnowledge.paramNotes[key] ?? "该参数用于控制模型学习方式，可按验证结果微调。"}</td>
+                            <td>{championKnowledge.paramNotes[key] ?? t("该参数用于控制模型学习方式，可按验证结果微调。", "Controls model behavior; tune by validation results.")}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <p className="muted">当前没有返回参数明细，建议重新运行一次任务后查看。</p>
+                  <p className="muted">{t("当前没有返回参数明细，建议重新运行一次任务后查看。", "No parameter details returned yet. Re-run to view them.")}</p>
                 )}
 
                 {championMetricEntries.length > 0 && (
@@ -1888,7 +2154,7 @@ print(scores)`;
               </div>
 
               <div className="knowledge-section">
-                <p className="label">冠军模型函数包（可直接调用）</p>
+                <p className="label">{t("冠军模型函数包（可直接调用）", "Champion function packages")}</p>
                 <ul className="knowledge-list">
                   {championKnowledge.functionPackages.map((item, index) => (
                     <li key={`champion-pkg-${index}`}>
@@ -1899,7 +2165,7 @@ print(scores)`;
               </div>
 
               <div className="knowledge-section">
-                <p className="label">冠军模型状态更新公式（递推）</p>
+                <p className="label">{t("冠军模型状态更新公式（递推）", "Champion state update equations")}</p>
                 <div className="markdown-math-list">
                   {championKnowledge.updateEquations.map((item, index) => (
                     <div className="math-block" key={`champion-update-eq-${index}`}>
@@ -1910,19 +2176,19 @@ print(scores)`;
               </div>
 
               <div className="knowledge-section">
-                <p className="label">参数如何带入模型（来源链路）</p>
+                <p className="label">{t("参数如何带入模型（来源链路）", "Parameter provenance trace")}</p>
                 {championParamTraceRows.length > 0 ? (
                   <div className="table-wrap compact-table">
                     <table>
                       <thead>
                         <tr>
-                          <th>参数</th>
-                          <th>默认值</th>
-                          <th>全局覆盖</th>
-                          <th>模型覆盖</th>
-                          <th>调参值</th>
-                          <th>最终值</th>
-                          <th>最终来源</th>
+                          <th>{t("参数", "Parameter")}</th>
+                          <th>{t("默认值", "Default")}</th>
+                          <th>{t("全局覆盖", "Global override")}</th>
+                          <th>{t("模型覆盖", "Model override")}</th>
+                          <th>{t("调参值", "Tuned value")}</th>
+                          <th>{t("最终值", "Final value")}</th>
+                          <th>{t("最终来源", "Final source")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1941,17 +2207,17 @@ print(scores)`;
                     </table>
                   </div>
                 ) : (
-                  <p className="muted">该模型暂未返回参数来源链路（可能是失败模型或未完成阶段1）。</p>
+                  <p className="muted">{t("该模型暂未返回参数来源链路（可能是失败模型或未完成阶段1）。", "No parameter trace returned yet (model failed or Stage 1 not completed).")}</p>
                 )}
               </div>
 
               <div className="knowledge-section">
-                <p className="label">底层算法 Python 复现（冠军模型核心逻辑）</p>
+                <p className="label">{t("底层算法 Python 复现（冠军模型核心逻辑）", "Champion core Python reproduction")}</p>
                 <pre className="code-block">{championKnowledge.pythonReferenceCode}</pre>
               </div>
 
               <div className="knowledge-section">
-                <p className="label">冠军模型手算示例（代入具体数字）</p>
+                <p className="label">{t("冠军模型手算示例（代入具体数字）", "Champion manual calculation sample")}</p>
                 <ol className="guide-list">
                   {championKnowledge.manualCalculationSteps.map((workflowItem, index) => (
                     <li key={`champion-manual-calc-${index}`}>
@@ -1962,14 +2228,14 @@ print(scores)`;
               </div>
 
               <div className="knowledge-section">
-                <p className="label">指标复算 Python（可验证冠军分数）</p>
+                <p className="label">{t("指标复算 Python（可验证冠军分数）", "Metric audit Python (verify champion score)")}</p>
                 <pre className="code-block">{championMetricAuditPythonExample}</pre>
               </div>
 
               <div className="knowledge-section">
-                <p className="label">Excel 复现路径（冠军模型 + 当前指标）</p>
+                <p className="label">{t("Excel 复现路径（冠军模型 + 当前指标）", "Excel reproduction path (champion + metric)")}</p>
                 <p className="muted">
-                  先按冠军模型步骤计算预测值，再用下方当前指标的 Excel 公式做人手复核。
+                  {t("先按冠军模型步骤计算预测值，再用下方当前指标的 Excel 公式做人手复核。", "Compute champion predictions first, then manually verify with the metric formulas below.")}
                 </p>
                 <ol className="guide-list">
                   {championKnowledge.excelWorkflow.map((workflowItem, index) => (
@@ -1978,7 +2244,7 @@ print(scores)`;
                     </li>
                   ))}
                 </ol>
-                <p className="label">当前指标（{metric.toUpperCase()}）Excel 复核步骤</p>
+                <p className="label">{t("当前指标", "Current metric")}（{metric.toUpperCase()}）{t("Excel 复核步骤", "Excel verification steps")}</p>
                 <ol className="guide-list">
                   {activeMetricExcelWorkflow.map((workflowItem, index) => (
                     <li key={`champion-excel-metric-${index}`}>
@@ -1989,16 +2255,16 @@ print(scores)`;
               </div>
 
               <div className="knowledge-section">
-                <p className="label">阶段1回测样例（用于选优，含真实值）</p>
+                <p className="label">{t("阶段1回测样例（用于选优，含真实值）", "Stage 1 backtest samples (for selection, includes actual y)")}</p>
                 {championBacktestPreview.length > 0 ? (
                   <div className="table-wrap compact-table">
                     <table>
                       <thead>
                         <tr>
-                          <th>日期</th>
-                          <th>序列</th>
-                          <th>预测值 y_pred</th>
-                          <th>实际值 y</th>
+                          <th>{t("日期", "Date")}</th>
+                          <th>{t("序列", "Series")}</th>
+                          <th>{t("预测值 y_pred", "Predicted y_pred")}</th>
+                          <th>{t("实际值 y", "Actual y")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2014,21 +2280,21 @@ print(scores)`;
                     </table>
                   </div>
                 ) : (
-                  <p className="muted">还没有冠军模型预测样例。先运行一次任务，这里会自动出现数据。</p>
+                  <p className="muted">{t("还没有冠军模型预测样例。先运行一次任务，这里会自动出现数据。", "No champion sample rows yet. Run a task and data will appear here.")}</p>
                 )}
               </div>
 
               <div className="knowledge-section">
-                <p className="label">阶段2未来预测样例（真正未来值，无真实 y）</p>
+                <p className="label">{t("阶段2未来预测样例（真正未来值，无真实 y）", "Stage 2 future forecast samples (future y unknown)")}</p>
                 {futurePredictionPreview.length > 0 ? (
                   <div className="table-wrap compact-table">
                     <table>
                       <thead>
                         <tr>
-                          <th>未来日期</th>
-                          <th>序列</th>
-                          <th>预测值 y_pred</th>
-                          <th>真实值 y</th>
+                          <th>{t("未来日期", "Future date")}</th>
+                          <th>{t("序列", "Series")}</th>
+                          <th>{t("预测值 y_pred", "Predicted y_pred")}</th>
+                          <th>{t("真实值 y", "Actual y")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2037,22 +2303,22 @@ print(scores)`;
                             <td>{formatCell(row.ds)}</td>
                             <td>{formatCell(row.unique_id)}</td>
                             <td>{formatCell(row.y_pred)}</td>
-                            <td>（未来未知）</td>
+                            <td>{t("（未来未知）", "(future unknown)")}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <p className="muted">尚未生成阶段2未来预测。勾选“两阶段串行”后点击开始即可自动生成。</p>
+                  <p className="muted">{t("尚未生成阶段2未来预测。勾选“两阶段串行”后点击开始即可自动生成。", "Stage 2 future forecast is not generated yet. Enable two-stage flow and start to generate it automatically.")}</p>
                 )}
                 <p className="muted">
-                  说明：阶段1是历史回测用于选优；阶段2才是未来预测值（时间范围由上方“未来预测窗口”明确给出）。
+                  {t("说明：阶段1是历史回测用于选优；阶段2才是未来预测值（时间范围由上方“未来预测窗口”明确给出）。", "Note: Stage 1 is backtest for model selection, Stage 2 is true future forecasting.")}
                 </p>
               </div>
 
               <div className="knowledge-section">
-                <p className="label">业务动作建议（由指标和预测自动推导）</p>
+                <p className="label">{t("业务动作建议（由指标和预测自动推导）", "Business actions (derived from metrics and forecasts)")}</p>
                 <ul className="knowledge-list">
                   {championBusinessActions.map((item, index) => (
                     <li key={`champion-business-action-${index}`}>{item}</li>
@@ -2061,22 +2327,22 @@ print(scores)`;
               </div>
             </>
           ) : (
-            <p className="muted">暂无冠军模型。先运行任务后，这里会自动显示最优模型参数与操作步骤。</p>
+            <p className="muted">{t("暂无冠军模型。先运行任务后，这里会自动显示最优模型参数与操作步骤。", "No champion model yet. Run a task to populate this section.")}</p>
           )}
         </section>
 
         <section className="card full-width">
-          <h3>8) 模型排行榜</h3>
+          <h3>{t("8) 模型排行榜", "8) Model Leaderboard")}</h3>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>排名</th>
-                  <th>模型</th>
-                  <th>模型分类</th>
+                  <th>{t("排名", "Rank")}</th>
+                  <th>{t("模型", "Model")}</th>
+                  <th>{t("模型分类", "Family")}</th>
                   <th>{metric.toUpperCase()}</th>
-                  <th>训练耗时(秒)</th>
-                  <th>状态</th>
+                  <th>{t("训练耗时(秒)", "Training time (s)")}</th>
+                  <th>{t("状态", "Status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2084,7 +2350,7 @@ print(scores)`;
                   <tr key={row.model_name}>
                     <td>{index + 1}</td>
                     <td>{row.model_name}</td>
-                    <td>{FAMILY_LABELS[row.family] ?? row.family}</td>
+                    <td>{FAMILY_LABELS[language][row.family] ?? row.family}</td>
                     <td>{row.metrics[metric]?.toFixed(4)}</td>
                     <td>{row.training_seconds.toFixed(2)}</td>
                     <td>{row.status}</td>
@@ -2093,7 +2359,7 @@ print(scores)`;
                 {rankedResults.length === 0 && (
                   <tr>
                     <td colSpan={6} className="muted">
-                      暂无已完成结果。
+                      {t("暂无已完成结果。", "No completed results yet.")}
                     </td>
                   </tr>
                 )}
@@ -2102,18 +2368,49 @@ print(scores)`;
           </div>
         </section>
 
-        <FigurePanel title="9) 阶段1模型评分对比图" figure={selectionLeaderboardFigure} />
-        <FigurePanel title="10) 阶段1冠军回测（实际 vs 预测）" figure={selectionChampionFigure} />
-        <FigurePanel title="11) 阶段2冠军未来预测图（未来窗口）" figure={futureChampionFigure} />
-        <FigurePanel title="12) 阶段1冠军残差分布" figure={residualFigure} />
-        <FigurePanel title="13) 阶段1实际值 vs 预测值散点图" figure={scatterFigure} />
-        <FigurePanel title="14) 阶段1各模型训练耗时对比" figure={runtimeFigure} />
+        <FigurePanel
+          title={t("9) 阶段1模型评分对比图", "9) Stage 1 Score Comparison")}
+          figure={selectionLeaderboardFigure}
+          emptyText={t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}
+          loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
+        />
+        <FigurePanel
+          title={t("10) 阶段1冠军回测（实际 vs 预测）", "10) Stage 1 Champion Backtest (Actual vs Predicted)")}
+          figure={selectionChampionFigure}
+          emptyText={t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}
+          loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
+        />
+        <FigurePanel
+          title={t("11) 阶段2冠军未来预测图（未来窗口）", "11) Stage 2 Champion Future Forecast")}
+          figure={futureChampionFigure}
+          emptyText={t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}
+          loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
+        />
+        <FigurePanel
+          title={t("12) 阶段1冠军残差分布", "12) Stage 1 Champion Residual Distribution")}
+          figure={residualFigure}
+          emptyText={t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}
+          loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
+        />
+        <FigurePanel
+          title={t("13) 阶段1实际值 vs 预测值散点图", "13) Stage 1 Actual vs Predicted Scatter")}
+          figure={scatterFigure}
+          emptyText={t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}
+          loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
+        />
+        <FigurePanel
+          title={t("14) 阶段1各模型训练耗时对比", "14) Stage 1 Training Time Comparison")}
+          figure={runtimeFigure}
+          emptyText={t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}
+          loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
+        />
         <section className="card full-width">
-          <h3>15) 阶段1模型指标热力图</h3>
+          <h3>{t("15) 阶段1模型指标热力图", "15) Stage 1 Metric Heatmap")}</h3>
           {metricHeatmapFigure?.data && metricHeatmapFigure.data.length > 0 ? (
             <div className="plot-wrap">
               <PlotCanvas
                 figure={metricHeatmapFigure}
+                loadingText={t("图表引擎加载中，请稍后...", "Loading chart engine...")}
                 layoutOverrides={{
                   autosize: true,
                   paper_bgcolor: "#fff9ef",
@@ -2124,14 +2421,15 @@ print(scores)`;
               />
             </div>
           ) : (
-            <p className="muted">暂无可视化结果，先运行一次预测任务。</p>
+            <p className="muted">{t("暂无可视化结果，先运行一次预测任务。", "No visualization yet. Run a forecasting task first.")}</p>
           )}
         </section>
       </main>
 
       <footer>
         <p>
-          已支持：自动对比、自动调参、可视化与中文字段解释。{loading ? " 系统处理中..." : ""}
+          {t("已支持：自动对比、自动调参、可视化与中文字段解释。", "Supported: auto benchmark, auto tuning, visualizations, and bilingual field guidance.")}
+          {loading ? t(" 系统处理中...", " Processing...") : ""}
         </p>
       </footer>
     </div>
