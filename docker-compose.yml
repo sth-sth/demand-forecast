@@ -14,6 +14,7 @@ services:
     build:
       context: ./backend
     environment:
+      PORT: 8000
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forecast}:${POSTGRES_PASSWORD:-forecast}@db:5432/${POSTGRES_DB:-forecast}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
       UPLOAD_DIR: /app/data/uploads
