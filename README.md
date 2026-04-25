@@ -9,6 +9,7 @@
 - 多指标统一评估：MAE、RMSE、MAPE、sMAPE、WAPE、MASE
 - 模型排行榜与冠军模型图表输出
 - 前端上传数据、配置任务、查看结果
+- 前端中英文切换（中文 / English）
 - 后端任务执行、结果落库、可视化 JSON 输出
 
 ## 2. 技术栈
@@ -73,6 +74,11 @@ chmod +x scripts/demo.sh
 
 - 前端: http://localhost:8080
 - 后端 OpenAPI: http://localhost:8000/docs
+
+界面语言切换：
+
+- 页面右上角提供 `中文 / EN` 切换按钮
+- 切换后会记住你的语言偏好（localStorage）
 
 可选：临时公网展示（快速“上线”给他人访问）
 
@@ -312,6 +318,18 @@ Code: NOT_FOUND
 如果你希望避免临时隧道失效，建议使用“稳定后端域名 + Vercel 前端”模式：
 
 无 Linux 服务器时，推荐直接使用 Render 托管后端（数据库 + API）+ Vercel 托管前端：
+
+现在也支持直接在 Render 同时部署前后端（无需 Vercel）：
+
+1. 在 Render 选择 New + Blueprint，导入本仓库（根目录已提供 `render.yaml`）。
+2. Blueprint 会自动创建：
+	- `demand-forecast-backend`（Web Service）
+	- `demand-forecast-frontend`（Static Site）
+	- `demand-forecast-db`（PostgreSQL）
+3. 等部署完成后，直接访问前端：`https://demand-forecast-frontend.onrender.com`
+4. 后端健康检查：`https://demand-forecast-backend.onrender.com/api/health`
+
+如果你继续采用 Vercel 前端 + Render 后端，仍可按下面流程执行：
 
 1. 在 Render 选择 New + Blueprint，导入本仓库（根目录已提供 `render.yaml`）。
 2. 等 Render 创建完成后，获取后端地址（例如 `https://your-backend.onrender.com`）。
