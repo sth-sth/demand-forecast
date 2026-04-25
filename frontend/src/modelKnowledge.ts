@@ -1545,6 +1545,12 @@ function buildEnglishParamNotes(model: ModelCatalogItem, extra?: Record<string, 
 
 function buildEnglishKnowledge(model: ModelCatalogItem, zhKnowledge: ModelKnowledge): ModelKnowledge {
   const family = model.family in FAMILY_EN_OVERVIEW ? model.family : "baseline";
+  const fallbackFormula =
+    MODEL_FORMULAS[model.model_name] ?? ["$$\\hat{y}_{t+h}=f_\\theta(x_{1:t})$$"];
+  const fallbackPackages =
+    MODEL_FUNCTION_PACKAGES[model.model_name] ??
+    FAMILY_FUNCTION_PACKAGES[family] ??
+    ["`python` implementation package"];
   const formulaSymbols = (MODEL_FORMULA_PARAMETERS[model.model_name] ?? []).map((row) => row.symbol);
   const formulaParameters =
     formulaSymbols.length > 0
@@ -1564,11 +1570,11 @@ function buildEnglishKnowledge(model: ModelCatalogItem, zhKnowledge: ModelKnowle
   return {
     overview: `${model.model_name}: ${FAMILY_EN_OVERVIEW[family]}`,
     logic: FAMILY_EN_LOGIC[family] ?? FAMILY_EN_LOGIC.baseline,
-    functionPackages: zhKnowledge.functionPackages,
-    formula: zhKnowledge.formula,
+    functionPackages: fallbackPackages,
+    formula: fallbackFormula,
     updateEquations: [
       "State update and recursive forecast equations are listed below.",
-      ...zhKnowledge.formula,
+      ...fallbackFormula,
     ],
     formulaParameters,
     mathWorkflow: [
@@ -1593,7 +1599,24 @@ function buildEnglishKnowledge(model: ModelCatalogItem, zhKnowledge: ModelKnowle
       { step: "Step 4: Evaluate", detail: "Compute unified metrics and compare against baseline." },
       { step: "Step 5: Promote", detail: "Promote only when metrics and business checks pass." },
     ],
-    pythonReferenceCode: zhKnowledge.pythonReferenceCode,
+    pythonReferenceCode: `# ${model.model_name} reference workflow (English template)
+  import pandas as pd
+
+  def run_${model.model_name.toLowerCase()}(df: pd.DataFrame, horizon: int = 14):
+    """
+    Required columns: ds, y, unique_id
+    1) sort data by ds
+    2) fit ${model.model_name}
+    3) generate horizon-step forecast
+    """
+    df = df.sort_values("ds").copy()
+    # TODO: plug in the concrete ${model.model_name} implementation
+    return {
+      "model": "${model.model_name}",
+      "horizon": horizon,
+      "rows": len(df),
+    }
+  `,
     excelWorkflow: [
       "Place actual values and predictions in separate columns.",
       "Recompute selected metric with explicit Excel formulas.",
